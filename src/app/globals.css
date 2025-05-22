@@ -1,26 +1,62 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Background Colors */
+  --background: #F9FAFB;
+  --background-light: #FFFFFF;
+  --background-dark: #111827;
+  
+  /* Text Colors */
+  --text: #1F2937;
+  --text-light: #4B5563;
+  --text-dark: #F9FAFB;
+  --text-muted: #6B7280;
+  
+  /* Primary Colors */
+  --primary: #4F46E5;
+  --primary-light: #6366F1;
+  --primary-dark: #4338CA;
+  
+  /* Secondary Colors */
+  --secondary: #7C3AED;
+  --secondary-light: #8B5CF6;
+  --secondary-dark: #6D28D9;
+  
+  /* Accent Colors */
+  --accent: #059669;
+  --accent-light: #10B981;
+  --accent-dark: #047857;
+  
+  /* Border Colors */
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+  --border-dark: #374151;
+  
+  /* Status Colors */
+  --error: #DC2626;
+  --error-light: #EF4444;
+  --error-dark: #B91C1C;
+  
+  --success: #059669;
+  --success-light: #10B981;
+  --success-dark: #047857;
+  
+  --warning: #D97706;
+  --warning-light: #F59E0B;
+  --warning-dark: #B45309;
+  
+  /* Surface Colors */
+  --surface: #FFFFFF;
+  --surface-light: #F9FAFB;
+  --surface-dark: #1F2937;
+  --surface-card: #FFFFFF;
+  --surface-card-dark: #1F2937;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  color: var(--text);
 }

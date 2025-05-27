@@ -62,7 +62,7 @@ class ProjectService {
     }
   }
 
-  async getProject(id: string): Promise<Project> {
+  async getProject(id: string): Promise<Project | null> {
     try {
       const response = await fetch(`${this.baseUrl}/${id}`, {
         headers: getHeaders(),
@@ -73,6 +73,10 @@ class ProjectService {
         if (response.status === 401) {
           await authService.logout();
           window.location.href = '/login';
+          return null;
+        }
+        if (response.status === 404) {
+          return null;
         }
         throw new Error(`Failed to fetch project: ${response.status} ${response.statusText}`);
       }
@@ -83,11 +87,7 @@ class ProjectService {
         throw new Error(result.message || 'Failed to fetch project');
       }
 
-      if (!result.data) {
-        throw new Error('Project not found');
-      }
-
-      return result.data;
+      return result.data || null;
     } catch (error) {
       console.error('Error in getProject:', error);
       throw error;

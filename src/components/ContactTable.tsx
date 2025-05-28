@@ -23,6 +23,10 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const [isCalling, setIsCalling] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
   const [callSuccess, setCallSuccess] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
+  const MAX_POLLING_DURATION = 5 * 60 * 1000; // 5 dakika
+  const [selectedCallDetails, setSelectedCallDetails] = useState<Contact | null>(null);
 
   useEffect(() => {
     loadContacts();
@@ -30,18 +34,34 @@ export default function ContactTable({ projectId }: ContactTableProps) {
 
   const loadContacts = async () => {
     try {
-      const savedContacts = await contactService.getContacts(projectId);
-      console.log('loadContacts - Gelen müşteriler:', savedContacts);
+      console.log('Mevcut müşteriler yükleniyor...');
+      console.log('Project ID:', projectId);
       
-      if (savedContacts.length > 0) {
+      const savedContacts = await contactService.getContacts(projectId);
+      console.log('API\'den gelen ham veri:', savedContacts);
+      
+      if (savedContacts && Array.isArray(savedContacts)) {
+        console.log('Müşteri sayısı:', savedContacts.length);
+        console.log('Müşteri detayları:', savedContacts.map(contact => ({
+          id: contact.id,
+          name: contact.name,
+          phoneNumber: contact.phoneNumber,
+          status: contact.status,
+          retellData: contact.retellData,
+          createdAt: contact.createdAt,
+          updatedAt: contact.updatedAt
+        })));
+        
         setSavedCustomers(savedContacts);
-        console.log('loadContacts - State güncellendi');
       } else {
-        console.log('loadContacts - Gelen müşteri listesi boş');
+        console.warn('Geçersiz veri formatı:', savedContacts);
         setSavedCustomers([]);
       }
     } catch (error) {
-      console.error('Error loading contacts:', error);
+      console.error('Müşteriler yüklenirken hata:', error);
+      if (error instanceof Error) {
+        console.error('Hata detayı:', error.message);
+      }
       setSavedCustomers([]);
     }
   };
@@ -124,6 +144,12 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   }, [projectId]);
 
   const handleCustomerSelect = (customer: Contact) => {
+    console.log('Müşteri seçimi değişiyor:', {
+      name: customer.name,
+      phoneNumber: customer.phoneNumber,
+      currentSelection: selectedCustomers.map(c => c.phoneNumber)
+    });
+
     setSelectedCustomers(prev => {
       const isSelected = prev.some(c => c.phoneNumber === customer.phoneNumber);
       if (isSelected) {
@@ -134,20 +160,114 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     });
   };
 
+  // Retell verilerini kontrol et
+  const checkRetellData = async () => {
+    try {
+      console.log('Retell verileri kontrol ediliyor...');
+      const updatedContacts = await contactService.getRetellData(projectId);
+      console.log('Gelen retell verileri:', updatedContacts);
+      
+      if (updatedContacts.length > 0) {
+        console.log('Güncellenecek müşteri sayısı:', updatedContacts.length);
+        setSavedCustomers(prevCustomers => {
+          const updatedCustomers = prevCustomers.map(customer => {
+            const updatedContact = updatedContacts.find(c => c.phoneNumber === customer.phoneNumber);
+            if (updatedContact) {
+              console.log('Müşteri güncelleniyor:', {
+                phoneNumber: customer.phoneNumber,
+                oldStatus: customer.status,
+                newStatus: updatedContact.status,
+                retellData: updatedContact.retellData
+              });
+              return {
+                ...customer,
+                status: updatedContact.status,
+                retellData: updatedContact.retellData
+              };
+            }
+            return customer;
+          });
+
+          console.log('Güncellenmiş müşteri listesi:', updatedCustomers);
+          return updatedCustomers;
+        });
+      } else {
+        console.log('Güncellenecek yeni veri bulunamadı');
+      }
+    } catch (error) {
+      console.error('Retell verileri kontrol edilirken hata:', error);
+      if (error instanceof Error) {
+        console.error('Hata detayı:', error.message);
+      }
+    }
+  };
+
+  // Polling mekanizması
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout;
+
+    if (isPolling) {
+      // Polling başlangıç zamanını kaydet
+      setPollingStartTime(Date.now());
+      
+      // İlk kontrol
+      checkRetellData();
+      
+      // Her 10 saniyede bir kontrol et
+      intervalId = setInterval(checkRetellData, 10000);
+
+      // 5 dakika sonra polling'i durdur
+      timeoutId = setTimeout(() => {
+        console.log('5 dakika doldu, polling durduruluyor...');
+        setIsPolling(false);
+      }, MAX_POLLING_DURATION);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isPolling, projectId]);
+
+  // Polling durumunu izle
+  useEffect(() => {
+    if (!isPolling && pollingStartTime) {
+      const duration = Date.now() - pollingStartTime;
+      console.log(`Polling durdu. Toplam süre: ${Math.floor(duration / 1000)} saniye`);
+      setPollingStartTime(null);
+    }
+  }, [isPolling, pollingStartTime]);
+
+  // Arama başlatıldığında polling'i başlat
   const handleStartCalls = async () => {
     if (selectedCustomers.length === 0) {
       setCallError('Lütfen en az bir müşteri seçiniz.');
       return;
     }
 
+    console.log('Seçili müşteriler:', selectedCustomers.map(c => ({
+      name: c.name,
+      phoneNumber: c.phoneNumber
+    })));
+
     setIsCalling(true);
     setCallError(null);
     setCallSuccess(false);
 
     try {
+      // Sadece seçili müşterilerin telefon numaralarını gönder
+      const selectedPhoneNumbers = selectedCustomers.map(c => c.phoneNumber);
+      console.log('Arama yapılacak telefon numaraları:', selectedPhoneNumbers);
+
       await contactService.startCalls(selectedCustomers);
       setCallSuccess(true);
       setSelectedCustomers([]);
+      setIsPolling(true);
     } catch (error) {
       setCallError('Arama başlatılırken bir hata oluştu. Lütfen tekrar deneyiniz.');
       console.error('Arama hatası:', error);
@@ -155,6 +275,154 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       setIsCalling(false);
     }
   };
+
+  // Özeti kısaltma fonksiyonu
+  const truncateSummary = (summary: string, maxLength: number = 100) => {
+    if (summary.length <= maxLength) return summary;
+    return summary.substring(0, maxLength) + '...';
+  };
+
+  // Modal bileşeni
+  const CallDetailsModal = ({ contact, onClose }: { contact: Contact, onClose: () => void }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-xl font-semibold">Arama Detayları</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-medium text-gray-700">Müşteri Bilgileri</h4>
+            <p>İsim: {contact.name}</p>
+            <p>Telefon: {contact.phoneNumber}</p>
+          </div>
+
+          {contact.retellData && (
+            <>
+              <div>
+                <h4 className="font-medium text-gray-700">Arama Durumu</h4>
+                <p>Durum: {contact.retellData.callStatus}</p>
+                {contact.retellData.duration && (
+                  <p>Süre: {Math.floor(contact.retellData.duration / 60)}:{(contact.retellData.duration % 60).toString().padStart(2, '0')}</p>
+                )}
+              </div>
+
+              {contact.retellData.callAnalysis && (
+                <div>
+                  <h4 className="font-medium text-gray-700">Arama Analizi</h4>
+                  <p className="whitespace-pre-wrap">{contact.retellData.callAnalysis.call_summary}</p>
+                  <p>Duygu Analizi: {contact.retellData.callAnalysis.user_sentiment}</p>
+                  <p>Başarılı: {contact.retellData.callAnalysis.call_successful ? 'Evet' : 'Hayır'}</p>
+                  <p>Sesli Mesaj: {contact.retellData.callAnalysis.in_voicemail ? 'Evet' : 'Hayır'}</p>
+                </div>
+              )}
+
+              {contact.retellData.recordingUrl && (
+                <div>
+                  <h4 className="font-medium text-gray-700">Kayıt</h4>
+                  <a 
+                    href={contact.retellData.recordingUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700"
+                  >
+                    Kaydı Dinle
+                  </a>
+                </div>
+              )}
+
+              {contact.retellData.custom_analysis_data?.lastUpdated && (
+                <p className="text-sm text-gray-500">
+                  Son Güncelleme: {new Date(contact.retellData.custom_analysis_data.lastUpdated).toLocaleString('tr-TR')}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Tablo satırını güncelle
+  const renderCustomerRow = (customer: Contact) => (
+    <tr key={customer.id} className="hover:bg-gray-50">
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        <input
+          type="checkbox"
+          checked={selectedCustomers.some(c => c.phoneNumber === customer.phoneNumber)}
+          onChange={() => handleCustomerSelect(customer)}
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+        />
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        {customer.name}
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        {customer.phoneNumber}
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+          ${customer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+            customer.status === 'completed' ? 'bg-green-100 text-green-800' : 
+            customer.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+            'bg-red-100 text-red-800'}`}>
+          {customer.status === 'pending' ? 'Beklemede' : 
+           customer.status === 'completed' ? 'Tamamlandı' : 
+           customer.status === 'processing' ? 'İşleniyor' : 
+           'Başarısız'}
+        </span>
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap text-sm text-gray-500">
+        {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('tr-TR') : '-'}
+      </td>
+      {customer.retellData && (
+        <td className="px-6 py-4 border-b whitespace-nowrap text-sm">
+          <div className="space-y-2">
+            {customer.retellData.callStatus && (
+              <p className="font-medium">Durum: {customer.retellData.callStatus}</p>
+            )}
+            {customer.retellData.duration && (
+              <p>Süre: {Math.floor(customer.retellData.duration / 60)}:{(customer.retellData.duration % 60).toString().padStart(2, '0')}</p>
+            )}
+            {customer.retellData.callAnalysis?.call_summary && (
+              <div>
+                <p className="text-gray-600">
+                  Özet: {truncateSummary(customer.retellData.callAnalysis.call_summary)}
+                </p>
+                <button
+                  onClick={() => setSelectedCallDetails(customer)}
+                  className="text-blue-500 hover:text-blue-700 text-sm mt-1"
+                >
+                  Detayları Gör
+                </button>
+              </div>
+            )}
+            {customer.retellData.callAnalysis?.user_sentiment && (
+              <p className="text-gray-600">Duygu: {customer.retellData.callAnalysis.user_sentiment}</p>
+            )}
+            {customer.retellData.recordingUrl && (
+              <a 
+                href={customer.retellData.recordingUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700 block mt-1"
+              >
+                Kaydı Dinle
+              </a>
+            )}
+          </div>
+        </td>
+      )}
+    </tr>
+  );
 
   return (
     <div className="w-full">
@@ -233,6 +501,12 @@ export default function ContactTable({ projectId }: ContactTableProps) {
             <span className="text-sm text-gray-500">
               {savedCustomers.length} müşteri bulundu
             </span>
+            {isPolling && (
+              <span className="text-sm text-blue-500 flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                Görüşme durumu güncelleniyor...
+              </span>
+            )}
             <button
               onClick={handleStartCalls}
               disabled={isCalling || selectedCustomers.length === 0}
@@ -273,45 +547,17 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                 <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Kayıt Tarihi
                 </th>
+                <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Görüşme Detayları
+                </th>
               </tr>
             </thead>
             <tbody>
               {savedCustomers && savedCustomers.length > 0 ? (
-                savedCustomers.map((customer, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 border-b whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedCustomers.some(c => c.phoneNumber === customer.phoneNumber)}
-                        onChange={() => handleCustomerSelect(customer)}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                    </td>
-                    <td className="px-6 py-4 border-b whitespace-nowrap">
-                      {customer.name}
-                    </td>
-                    <td className="px-6 py-4 border-b whitespace-nowrap">
-                      {customer.phoneNumber}
-                    </td>
-                    <td className="px-6 py-4 border-b whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        ${customer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                          customer.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                          'bg-gray-100 text-gray-800'}`}>
-                        {customer.status === 'pending' ? 'Beklemede' : 
-                         customer.status === 'completed' ? 'Tamamlandı' : 
-                         customer.status === 'processing' ? 'İşleniyor' : 
-                         'Başarısız'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 border-b whitespace-nowrap text-sm text-gray-500">
-                      {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('tr-TR') : '-'}
-                    </td>
-                  </tr>
-                ))
+                savedCustomers.map(renderCustomerRow)
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                     Henüz kayıtlı müşteri bulunmuyor
                   </td>
                 </tr>
@@ -359,6 +605,14 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Modal */}
+      {selectedCallDetails && (
+        <CallDetailsModal
+          contact={selectedCallDetails}
+          onClose={() => setSelectedCallDetails(null)}
+        />
+      )}
     </div>
   );
 } 

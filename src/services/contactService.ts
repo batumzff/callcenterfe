@@ -6,10 +6,31 @@ export interface Contact {
   name: string;
   phoneNumber: string;
   projectId?: string;
-  status?: 'pending' | 'completed';
+  status?: 'pending' | 'completed' | 'processing' | 'failed';
+  note?: string;
+  record?: string;
   searchResults?: any[];
   createdAt?: string;
   updatedAt?: string;
+  retellData?: {
+    callId?: string;
+    callStatus?: string;
+    transcript?: string;
+    recordingUrl?: string;
+    callAnalysis?: {
+      call_summary?: string;
+      user_sentiment?: string;
+      call_successful?: boolean;
+      in_voicemail?: boolean;
+    };
+    custom_analysis_data?: {
+      lastUpdated?: string;
+    };
+    duration?: number;
+    summary?: string;
+    status?: string;
+    updatedAt?: string;
+  };
 }
 
 interface ApiResponse<T> {
@@ -42,7 +63,8 @@ class ContactService {
           credentials: 'include',
           body: JSON.stringify({
             name: contact.name,
-            phoneNumber: contact.phoneNumber
+            phoneNumber: contact.phoneNumber,
+            projectId: projectId
           }),
         });
 
@@ -72,24 +94,46 @@ class ContactService {
 
   async getContacts(projectId: string): Promise<Contact[]> {
     try {
+      console.log('Müşteri verileri için API çağrısı yapılıyor:', `${this.baseUrl}?projectId=${projectId}`);
       const response = await fetch(`${this.baseUrl}?projectId=${projectId}`, {
         headers: getHeaders(),
         credentials: 'include',
       });
 
+      console.log('API yanıt durumu:', response.status);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API hata yanıtı:', errorText);
         throw new Error(`Failed to fetch contacts: ${response.status} ${response.statusText}`);
       }
 
-      const result: ApiResponse<{customers: Contact[]}> = await response.json();
+      const result: ApiResponse<Contact[]> = await response.json();
+      console.log('API yanıt verisi (ham):', result);
       
       if (result.status === 'error') {
+        console.error('API hata durumu:', result.message);
         throw new Error(result.message || 'Failed to fetch contacts');
       }
 
-      return result.data?.customers || [];
+      if (!result.data) {
+        console.warn('API yanıtında veri bulunamadı:', result);
+        return [];
+      }
+
+      console.log('İşlenmiş müşteri verileri:', result.data.map(contact => ({
+        id: contact.id,
+        name: contact.name,
+        phoneNumber: contact.phoneNumber,
+        status: contact.status,
+        retellData: contact.retellData,
+        createdAt: contact.createdAt,
+        updatedAt: contact.updatedAt
+      })));
+
+      return result.data;
     } catch (error) {
-      console.error('Error in getContacts:', error);
+      console.error('Müşteri verileri alınırken hata:', error);
       throw error;
     }
   }
@@ -145,8 +189,18 @@ class ContactService {
 
   async startCalls(contacts: Contact[]): Promise<void> {
     try {
+      console.log('Arama başlatılıyor, seçili müşteriler:', contacts.map(c => ({
+        name: c.name,
+        phoneNumber: c.phoneNumber
+      })));
+
       // Her bir müşteri için ayrı ayrı arama başlat
       for (const contact of contacts) {
+        console.log('Müşteri için arama başlatılıyor:', {
+          name: contact.name,
+          phoneNumber: contact.phoneNumber
+        });
+
         const response = await fetch(`${API_BASE_URL}/retell/call`, {
           method: 'POST',
           headers: getHeaders(),
@@ -159,17 +213,76 @@ class ContactService {
         });
 
         if (!response.ok) {
+          console.error('Arama başlatma hatası:', {
+            status: response.status,
+            statusText: response.statusText,
+            customer: contact.name
+          });
           throw new Error(`Failed to start calls: ${response.status} ${response.statusText}`);
         }
 
         const result: ApiResponse<void> = await response.json();
         
         if (result.status === 'error') {
+          console.error('API hata yanıtı:', {
+            message: result.message,
+            customer: contact.name
+          });
           throw new Error(result.message || 'Failed to start calls');
         }
+
+        console.log('Arama başarıyla başlatıldı:', contact.name);
       }
     } catch (error) {
       console.error('Error in startCalls:', error);
+      throw error;
+    }
+  }
+
+  async getRetellData(projectId: string): Promise<Contact[]> {
+    try {
+      console.log('Retell verileri için API çağrısı yapılıyor:', `${this.baseUrl}/retell-data?projectId=${projectId}`);
+      const response = await fetch(`${this.baseUrl}/retell-data?projectId=${projectId}`, {
+        headers: getHeaders(),
+        credentials: 'include',
+      });
+
+      console.log('API yanıt durumu:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API hata yanıtı:', errorText);
+        throw new Error(`Failed to fetch retell data: ${response.status} ${response.statusText}`);
+      }
+
+      const result: ApiResponse<Contact[]> = await response.json();
+      console.log('API yanıt verisi:', result);
+      
+      if (result.status === 'error') {
+        console.error('API hata durumu:', result.message);
+        throw new Error(result.message || 'Failed to fetch retell data');
+      }
+
+      if (!result.data) {
+        console.warn('API yanıtında veri bulunamadı:', result);
+        return [];
+      }
+
+      // Her bir müşteri için retell verilerini işle
+      const processedData = result.data.map(contact => {
+        console.log('İşlenen müşteri verisi:', {
+          name: contact.name,
+          phoneNumber: contact.phoneNumber,
+          status: contact.status,
+          retellData: contact.retellData
+        });
+        return contact;
+      });
+
+      console.log('İşlenmiş retell verileri:', processedData);
+      return processedData;
+    } catch (error) {
+      console.error('Retell verileri alınırken hata:', error);
       throw error;
     }
   }

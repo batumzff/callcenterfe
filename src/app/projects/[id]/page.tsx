@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import ProjectDetail from './ProjectDetail';
-import { Metadata } from 'next';
 
 type Props = {
   params: Promise<{ id: string }>;

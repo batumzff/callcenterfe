@@ -8,7 +8,7 @@ type Props = {
 
 // This is a Server Component
 export default async function ProjectPage({ params, searchParams }: Props) {
-  const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams]);
+  const [resolvedParams] = await Promise.all([params, searchParams]);
 
   return (
     <Suspense fallback={

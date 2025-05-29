@@ -1,7 +1,14 @@
 import { Suspense } from 'react';
 import ProjectDetail from './ProjectDetail';
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: {
+    id: string;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+export default function ProjectPage({ params }: PageProps) {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen">

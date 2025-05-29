@@ -1,14 +1,12 @@
 import { Suspense } from 'react';
 import ProjectDetail from './ProjectDetail';
 
-interface PageProps {
-  params: {
-    id: string;
-  };
-  searchParams: { [key: string]: string | string[] | undefined };
+type Props = {
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
 }
 
-export default function ProjectPage({ params }: PageProps) {
+export default function ProjectPage(props: Props) {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen">
@@ -18,7 +16,7 @@ export default function ProjectPage({ params }: PageProps) {
         </div>
       </div>
     }>
-      <ProjectDetail projectId={params.id} />
+      <ProjectDetail projectId={props.params.id} />
     </Suspense>
   );
 } 

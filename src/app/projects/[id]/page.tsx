@@ -1,11 +1,13 @@
 import { Suspense } from 'react';
 import ProjectDetail from './ProjectDetail';
 
-export default async function ProjectPage({
+// This is a Server Component
+export default function ProjectPage({
   params,
 }: {
   params: { id: string }
 }) {
+  // Server Components can be async
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen">

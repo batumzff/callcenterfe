@@ -2,12 +2,14 @@ import { Suspense } from 'react';
 import ProjectDetail from './ProjectDetail';
 
 // This is a Server Component
-export default function ProjectPage({
+export default async function ProjectPage({
   params,
 }: {
   params: { id: string }
 }) {
-  // Server Components can be async
+  // Await the params before using them
+  const { id } = await Promise.resolve(params);
+
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen">
@@ -17,7 +19,7 @@ export default function ProjectPage({
         </div>
       </div>
     }>
-      <ProjectDetail projectId={params.id} />
+      <ProjectDetail projectId={id} />
     </Suspense>
   );
 } 

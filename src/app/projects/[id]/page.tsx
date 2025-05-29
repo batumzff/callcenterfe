@@ -3,12 +3,12 @@ import ProjectDetail from './ProjectDetail';
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 // This is a Server Component
-export default async function ProjectPage({ params }: Props) {
-  const resolvedParams = await params;
+export default async function ProjectPage({ params, searchParams }: Props) {
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams]);
 
   return (
     <Suspense fallback={

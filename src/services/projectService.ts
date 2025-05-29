@@ -41,6 +41,7 @@ class ProjectService {
         method: 'GET',
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
       });
 
       if (!response.ok) {
@@ -67,6 +68,7 @@ class ProjectService {
       const response = await fetch(`${this.baseUrl}/${id}`, {
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
       });
 
       if (!response.ok) {
@@ -101,6 +103,7 @@ class ProjectService {
         method: 'POST',
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
         body: JSON.stringify(project),
       });
 
@@ -131,6 +134,7 @@ class ProjectService {
         method: 'PUT',
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
         body: JSON.stringify(project),
       });
 
@@ -161,6 +165,7 @@ class ProjectService {
         method: 'DELETE',
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
       });
 
       if (!response.ok) {

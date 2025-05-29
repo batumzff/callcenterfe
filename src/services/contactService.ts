@@ -66,6 +66,7 @@ class ContactService {
           method: 'POST',
           headers: getHeaders(),
           credentials: 'include',
+          mode: 'cors',
           body: JSON.stringify({
             name: contact.name,
             phoneNumber: contact.phoneNumber,
@@ -103,6 +104,7 @@ class ContactService {
       const response = await fetch(`${this.baseUrl}?projectId=${projectId}`, {
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
       });
 
       console.log('API yanıt durumu:', response.status);
@@ -149,6 +151,7 @@ class ContactService {
         method: 'PUT',
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
         body: JSON.stringify(data),
       });
 
@@ -175,6 +178,7 @@ class ContactService {
         method: 'DELETE',
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
       });
 
       if (!response.ok) {

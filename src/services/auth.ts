@@ -56,14 +56,14 @@ class AuthService {
 
   public async login(email: string, password: string): Promise<LoginResponse> {
     try {
-      console.log('Login attempt:', { email, password });
+      console.log('Login attempt:', { email });
       console.log('API URL:', `${API_BASE_URL}/auth/login`);
 
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: defaultHeaders,
-        credentials: 'include',
         mode: 'cors',
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -98,8 +98,8 @@ class AuthService {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: defaultHeaders,
-        credentials: 'include',
         mode: 'cors',
+        credentials: 'include',
         body: JSON.stringify({ name, email, password }),
       });
 
@@ -135,8 +135,8 @@ class AuthService {
           ...defaultHeaders,
           'Authorization': `Bearer ${this.token}`,
         },
-        credentials: 'include',
         mode: 'cors',
+        credentials: 'include',
       });
 
       if (!response.ok) {

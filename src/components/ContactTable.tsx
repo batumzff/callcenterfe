@@ -28,10 +28,6 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const MAX_POLLING_DURATION = 5 * 60 * 1000; // 5 dakika
   const [selectedCallDetails, setSelectedCallDetails] = useState<Contact | null>(null);
 
-  useEffect(() => {
-    loadContacts();
-  }, [projectId]);
-
   const loadContacts = async () => {
     try {
       console.log('Mevcut müşteriler yükleniyor...');
@@ -65,6 +61,10 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       setSavedCustomers([]);
     }
   };
+
+  useEffect(() => {
+    loadContacts();
+  }, [projectId, loadContacts]);
 
   const handleInputChange = (id: string, field: 'name' | 'phoneNumber', value: string) => {
     setContacts(prevContacts => 
@@ -141,7 +141,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   // Sayfa yüklendiğinde müşterileri otomatik yükle
   useEffect(() => {
     checkSavedCustomers();
-  }, [projectId]);
+  }, [projectId, checkSavedCustomers]);
 
   const handleCustomerSelect = (customer: Contact) => {
     console.log('Müşteri seçimi değişiyor:', {
@@ -208,16 +208,9 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     let timeoutId: NodeJS.Timeout;
 
     if (isPolling) {
-      // Polling başlangıç zamanını kaydet
       setPollingStartTime(Date.now());
-      
-      // İlk kontrol
       checkRetellData();
-      
-      // Her 10 saniyede bir kontrol et
       intervalId = setInterval(checkRetellData, 10000);
-
-      // 5 dakika sonra polling'i durdur
       timeoutId = setTimeout(() => {
         console.log('5 dakika doldu, polling durduruluyor...');
         setIsPolling(false);
@@ -232,7 +225,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
         clearTimeout(timeoutId);
       }
     };
-  }, [isPolling, projectId]);
+  }, [isPolling, checkRetellData, MAX_POLLING_DURATION]);
 
   // Polling durumunu izle
   useEffect(() => {

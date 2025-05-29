@@ -9,7 +9,12 @@ export interface Contact {
   status?: 'pending' | 'completed' | 'processing' | 'failed';
   note?: string;
   record?: string;
-  searchResults?: any[];
+  searchResults?: Array<{
+    id: string;
+    name: string;
+    phoneNumber: string;
+    status?: string;
+  }>;
   createdAt?: string;
   updatedAt?: string;
   retellData?: {

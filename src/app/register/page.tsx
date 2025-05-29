@@ -37,7 +37,7 @@ export default function RegisterPage() {
       );
       login(response.token);
       router.push('/dashboard');
-    } catch (err) {
+    } catch {
       setError('Registration failed. Please try again.');
     } finally {
       setIsLoading(false);

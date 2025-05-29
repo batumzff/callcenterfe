@@ -1,14 +1,15 @@
 import { Suspense } from 'react';
 import ProjectDetail from './ProjectDetail';
+import { Metadata } from 'next';
+
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: { [key: string]: string | string[] | undefined };
+}
 
 // This is a Server Component
-export default async function ProjectPage({
-  params,
-}: {
-  params: { id: string }
-}) {
-  // Await the params before using them
-  const { id } = await Promise.resolve(params);
+export default async function ProjectPage({ params }: Props) {
+  const resolvedParams = await params;
 
   return (
     <Suspense fallback={
@@ -19,7 +20,7 @@ export default async function ProjectPage({
         </div>
       </div>
     }>
-      <ProjectDetail projectId={id} />
+      <ProjectDetail projectId={resolvedParams.id} />
     </Suspense>
   );
 } 

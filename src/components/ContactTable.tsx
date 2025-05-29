@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Contact, contactService } from '@/services/contactService';
 
 interface ContactTableProps {
@@ -28,7 +28,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const MAX_POLLING_DURATION = 5 * 60 * 1000; // 5 dakika
   const [selectedCallDetails, setSelectedCallDetails] = useState<Contact | null>(null);
 
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
     try {
       console.log('Mevcut müşteriler yükleniyor...');
       console.log('Project ID:', projectId);
@@ -60,7 +60,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       }
       setSavedCustomers([]);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     loadContacts();
@@ -119,7 +119,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     }
   };
 
-  const checkSavedCustomers = async () => {
+  const checkSavedCustomers = useCallback(async () => {
     try {
       console.log('Müşteriler yükleniyor...');
       const customers = await contactService.getContacts(projectId);
@@ -136,7 +136,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       console.error('Müşteriler yüklenirken hata:', error);
       setSavedCustomers([]);
     }
-  };
+  }, [projectId]);
 
   // Sayfa yüklendiğinde müşterileri otomatik yükle
   useEffect(() => {
@@ -161,7 +161,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   };
 
   // Retell verilerini kontrol et
-  const checkRetellData = async () => {
+  const checkRetellData = useCallback(async () => {
     try {
       console.log('Retell verileri kontrol ediliyor...');
       const updatedContacts = await contactService.getRetellData(projectId);
@@ -200,7 +200,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
         console.error('Hata detayı:', error.message);
       }
     }
-  };
+  }, [projectId]);
 
   // Polling mekanizması
   useEffect(() => {

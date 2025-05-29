@@ -13,5 +13,11 @@
   ],
   "env": {
     "NEXT_PUBLIC_API_URL": "https://api.example.com"
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://callcenter-xc0l.onrender.com/api/:path*"
+    }
+  ]
 } 

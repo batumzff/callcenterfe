@@ -2,7 +2,7 @@ import { API_BASE_URL } from '@/config/api';
 import { authService } from './auth';
 
 export interface Contact {
-  id: string;
+  _id: string;
   name: string;
   phoneNumber: string;
   projectId?: string;
@@ -56,7 +56,7 @@ const getHeaders = () => {
 class ContactService {
   private baseUrl = `${API_BASE_URL}/customers`;
 
-  async saveContacts(projectId: string, contacts: Omit<Contact, 'id'>[]): Promise<Contact[]> {
+  async saveContacts(projectId: string, contacts: Omit<Contact, '_id'>[]): Promise<Contact[]> {
     try {
       const savedContacts = [];
       
@@ -129,7 +129,7 @@ class ContactService {
       }
 
       console.log('İşlenmiş müşteri verileri:', result.data.map(contact => ({
-        id: contact.id,
+        id: contact._id,
         name: contact.name,
         phoneNumber: contact.phoneNumber,
         status: contact.status,
@@ -182,6 +182,8 @@ class ContactService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Server response:', errorData);
         throw new Error(`Failed to delete contact: ${response.status} ${response.statusText}`);
       }
 

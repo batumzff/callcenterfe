@@ -10,7 +10,7 @@ interface ContactTableProps {
 export default function ContactTable({ projectId }: ContactTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(
     Array(2).fill(null).map((_, index) => ({
-      id: `contact-${Date.now()}-${index}`,
+      _id: `contact-${Date.now()}-${index}`,
       name: '',
       phoneNumber: ''
     }))
@@ -27,6 +27,11 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
   const MAX_POLLING_DURATION = 5 * 60 * 1000; // 5 dakika
   const [selectedCallDetails, setSelectedCallDetails] = useState<Contact | null>(null);
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
 
   const loadContacts = useCallback(async () => {
     try {
@@ -39,7 +44,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       if (savedContacts && Array.isArray(savedContacts)) {
         console.log('Müşteri sayısı:', savedContacts.length);
         console.log('Müşteri detayları:', savedContacts.map(contact => ({
-          id: contact.id,
+          _id: contact._id,
           name: contact.name,
           phoneNumber: contact.phoneNumber,
           status: contact.status,
@@ -69,14 +74,14 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const handleInputChange = (id: string, field: 'name' | 'phoneNumber', value: string) => {
     setContacts(prevContacts => 
       prevContacts.map(contact => 
-        contact.id === id ? { ...contact, [field]: value } : contact
+        contact._id === id ? { ...contact, [field]: value } : contact
       )
     );
   };
 
   const addNewRow = () => {
     const newContact: Contact = {
-      id: `contact-${Date.now()}-${contacts.length}`,
+      _id: `contact-${Date.now()}-${contacts.length}`,
       name: '',
       phoneNumber: ''
     };
@@ -104,7 +109,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       
       // Başarılı kayıttan sonra formu temizle
       setContacts(Array(2).fill(null).map((_, index) => ({
-        id: `contact-${Date.now()}-${index}`,
+        _id: `contact-${Date.now()}-${index}`,
         name: '',
         phoneNumber: ''
       })));
@@ -344,78 +349,174 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     </div>
   );
 
-  // Tablo satırını güncelle
-  const renderCustomerRow = (customer: Contact) => (
-    <tr key={customer.id} className="hover:bg-gray-50">
-      <td className="px-6 py-4 border-b whitespace-nowrap">
-        <input
-          type="checkbox"
-          checked={selectedCustomers.some(c => c.phoneNumber === customer.phoneNumber)}
-          onChange={() => handleCustomerSelect(customer)}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-        />
-      </td>
-      <td className="px-6 py-4 border-b whitespace-nowrap">
-        {customer.name}
-      </td>
-      <td className="px-6 py-4 border-b whitespace-nowrap">
-        {customer.phoneNumber}
-      </td>
-      <td className="px-6 py-4 border-b whitespace-nowrap">
-        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-          ${customer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-            customer.status === 'completed' ? 'bg-green-100 text-green-800' : 
-            customer.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-            'bg-red-100 text-red-800'}`}>
-          {customer.status === 'pending' ? 'Beklemede' : 
-           customer.status === 'completed' ? 'Tamamlandı' : 
-           customer.status === 'processing' ? 'İşleniyor' : 
-           'Başarısız'}
-        </span>
-      </td>
-      <td className="px-6 py-4 border-b whitespace-nowrap text-sm text-gray-500">
-        {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('tr-TR') : '-'}
-      </td>
-      {customer.retellData && (
-        <td className="px-6 py-4 border-b whitespace-nowrap text-sm">
-          <div className="space-y-2">
-            {customer.retellData.callStatus && (
-              <p className="font-medium">Durum: {customer.retellData.callStatus}</p>
-            )}
-            {customer.retellData.duration && (
-              <p>Süre: {Math.floor(customer.retellData.duration / 60)}:{(customer.retellData.duration % 60).toString().padStart(2, '0')}</p>
-            )}
-            {customer.retellData.callAnalysis?.call_summary && (
-              <div>
-                <p className="text-gray-600">
-                  Özet: {truncateSummary(customer.retellData.callAnalysis.call_summary)}
-                </p>
-                <button
-                  onClick={() => setSelectedCallDetails(customer)}
-                  className="text-blue-500 hover:text-blue-700 text-sm mt-1"
-                >
-                  Detayları Gör
-                </button>
-              </div>
-            )}
-            {customer.retellData.callAnalysis?.user_sentiment && (
-              <p className="text-gray-600">Duygu: {customer.retellData.callAnalysis.user_sentiment}</p>
-            )}
-            {customer.retellData.recordingUrl && (
-              <a 
-                href={customer.retellData.recordingUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-700 block mt-1"
-              >
-                Kaydı Dinle
-              </a>
-            )}
+  const handleDeleteClick = (customer: Contact) => {
+    setContactToDelete(customer);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!contactToDelete?._id) {
+      console.error('Geçersiz ID:', contactToDelete);
+      setDeleteError('Geçersiz müşteri ID\'si.');
+      return;
+    }
+
+    setDeletingCustomerId(contactToDelete._id);
+    setDeleteError(null);
+    setDeleteSuccess(false);
+
+    try {
+      console.log('API çağrısı yapılıyor...');
+      await contactService.deleteContact(contactToDelete._id);
+      console.log('Silme işlemi başarılı');
+      setDeleteSuccess(true);
+      // Silinen müşteriyi listeden kaldır
+      setSavedCustomers(prev => prev.filter(c => c._id !== contactToDelete._id));
+    } catch (error) {
+      console.error('Silme hatası:', error);
+      setDeleteError('Müşteri silinirken bir hata oluştu. Lütfen tekrar deneyiniz.');
+    } finally {
+      setDeletingCustomerId(null);
+      setDeleteModalOpen(false);
+      setContactToDelete(null);
+    }
+  };
+
+  // Silme Onay Modalı
+  const DeleteConfirmationModal = () => {
+    if (!deleteModalOpen || !contactToDelete) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="text-xl font-semibold text-gray-900">Müşteri Silme</h3>
+            <button
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setContactToDelete(null);
+              }}
+              className="text-gray-400 hover:text-gray-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
+          
+          <div className="mb-6">
+            <p className="text-gray-600">
+              <span className="font-medium">{contactToDelete.name}</span> isimli müşteriyi silmek istediğinizden emin misiniz?
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Bu işlem geri alınamaz.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setContactToDelete(null);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleDeleteConfirm}
+              disabled={deletingCustomerId === contactToDelete._id}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deletingCustomerId === contactToDelete._id ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Siliniyor...
+                </div>
+              ) : (
+                'Sil'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Tablo satırını güncelle
+  const renderCustomerRow = (customer: Contact) => {
+    console.log('Müşteri render ediliyor:', customer);
+    return (
+      <tr key={customer._id} className="hover:bg-gray-50">
+        <td className="px-6 py-4 border-b whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={selectedCustomers.some(c => c.phoneNumber === customer.phoneNumber)}
+            onChange={() => handleCustomerSelect(customer)}
+            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          />
         </td>
-      )}
-    </tr>
-  );
+        <td className="px-6 py-4 border-b whitespace-nowrap">
+          {customer.name}
+        </td>
+        <td className="px-6 py-4 border-b whitespace-nowrap">
+          {customer.phoneNumber}
+        </td>
+        <td className="px-6 py-4 border-b whitespace-nowrap">
+          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+            ${customer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+              customer.status === 'completed' ? 'bg-green-100 text-green-800' : 
+              customer.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+              'bg-red-100 text-red-800'}`}>
+            {customer.status === 'pending' ? 'Beklemede' : 
+             customer.status === 'completed' ? 'Tamamlandı' : 
+             customer.status === 'processing' ? 'İşleniyor' : 
+             'Başarısız'}
+          </span>
+        </td>
+        <td className="px-6 py-4 border-b whitespace-nowrap text-sm text-gray-500">
+          {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('tr-TR') : '-'}
+        </td>
+        {customer.retellData && (
+          <td className="px-6 py-4 border-b whitespace-nowrap text-sm">
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 text-xs font-semibold rounded-full 
+                ${customer.retellData.callStatus === 'completed' ? 'bg-green-100 text-green-800' : 
+                  customer.retellData.callStatus === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                  customer.retellData.callStatus === 'failed' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'}`}>
+                {customer.retellData.callStatus === 'completed' ? 'Tamamlandı' :
+                 customer.retellData.callStatus === 'in_progress' ? 'Devam Ediyor' :
+                 customer.retellData.callStatus === 'failed' ? 'Başarısız' :
+                 'Beklemede'}
+              </span>
+              <button
+                onClick={() => setSelectedCallDetails(customer)}
+                className="text-blue-500 hover:text-blue-700 text-sm"
+              >
+                Detayları Gör
+              </button>
+            </div>
+          </td>
+        )}
+        <td className="px-6 py-4 border-b whitespace-nowrap text-right text-sm font-medium">
+          <button
+            onClick={() => handleDeleteClick(customer)}
+            disabled={deletingCustomerId === customer._id}
+            className="inline-flex items-center justify-center p-2 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deletingCustomerId === customer._id ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div className="w-full">
@@ -486,6 +587,18 @@ export default function ContactTable({ projectId }: ContactTableProps) {
         </div>
       )}
 
+      {deleteError && (
+        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <p>{deleteError}</p>
+        </div>
+      )}
+
+      {deleteSuccess && (
+        <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+          <p>Müşteri başarıyla silindi!</p>
+        </div>
+      )}
+
       {/* Kayıtlı Müşteriler Tablosu */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
@@ -543,6 +656,9 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                 <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Görüşme Detayları
                 </th>
+                <th className="px-6 py-3 border-b text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  İşlemler
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -550,7 +666,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                 savedCustomers.map(renderCustomerRow)
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                     Henüz kayıtlı müşteri bulunmuyor
                   </td>
                 </tr>
@@ -574,12 +690,12 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           </thead>
           <tbody>
             {contacts.map((contact) => (
-              <tr key={contact.id} className="hover:bg-gray-50">
+              <tr key={contact._id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 border-b">
                   <input
                     type="text"
                     value={contact.name}
-                    onChange={(e) => handleInputChange(contact.id, 'name', e.target.value)}
+                    onChange={(e) => handleInputChange(contact._id, 'name', e.target.value)}
                     className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="İsim giriniz"
                   />
@@ -588,7 +704,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                   <input
                     type="tel"
                     value={contact.phoneNumber}
-                    onChange={(e) => handleInputChange(contact.id, 'phoneNumber', e.target.value)}
+                    onChange={(e) => handleInputChange(contact._id, 'phoneNumber', e.target.value)}
                     className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Telefon numarası giriniz"
                   />
@@ -606,6 +722,9 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           onClose={() => setSelectedCallDetails(null)}
         />
       )}
+
+      {/* Silme Onay Modalı */}
+      <DeleteConfirmationModal />
     </div>
   );
 } 

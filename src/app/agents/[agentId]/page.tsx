@@ -17,7 +17,6 @@ import {
   TextField,
   Alert,
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
 
 export default function AgentDetailPage() {
   const params = useParams();
@@ -133,8 +132,8 @@ export default function AgentDetailPage() {
             {agent.agent_name}
           </Typography>
           
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box>
               <Paper sx={{ p: 2, mb: 2 }}>
                 <Typography variant="h6" gutterBottom>
                   Welcome Message / LLM İçeriği
@@ -163,53 +162,55 @@ export default function AgentDetailPage() {
                   {saveError && <Alert severity="error">{saveError}</Alert>}
                 </Box>
               </Paper>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Basic Information
-                </Typography>
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="body1" gutterBottom>
-                    <strong>Agent ID:</strong> {agent.agent_id}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+              <Box sx={{ flex: 1 }}>
+                <Paper sx={{ p: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Basic Information
                   </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    <strong>Version:</strong> {agent.version}
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body1" gutterBottom>
+                      <strong>Agent ID:</strong> {agent.agent_id}
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <strong>Version:</strong> {agent.version}
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <strong>Status:</strong>{' '}
+                      <Chip
+                        label={agent.is_published ? 'Published' : 'Draft'}
+                        color={agent.is_published ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <strong>Language:</strong> {agent.language}
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <strong>Last Modified:</strong>{' '}
+                      {new Date(agent.last_modification_timestamp * 1000).toLocaleString()}
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Paper sx={{ p: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Voice Configuration
                   </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    <strong>Status:</strong>{' '}
-                    <Chip
-                      label={agent.is_published ? 'Published' : 'Draft'}
-                      color={agent.is_published ? 'success' : 'warning'}
-                      size="small"
-                    />
-                  </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    <strong>Language:</strong> {agent.language}
-                  </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    <strong>Last Modified:</strong>{' '}
-                    {new Date(agent.last_modification_timestamp * 1000).toLocaleString()}
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Voice Configuration
-                </Typography>
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="body1" gutterBottom>
-                    <strong>Voice Model:</strong> {agent.voice_model}
-                  </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    <strong>Voice ID:</strong> {agent.voice_id}
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-            <Grid item xs={12}>
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body1" gutterBottom>
+                      <strong>Voice Model:</strong> {agent.voice_model}
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <strong>Voice ID:</strong> {agent.voice_id}
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Box>
+            </Box>
+            <Box>
               <Paper sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
                   Response Engine
@@ -226,8 +227,8 @@ export default function AgentDetailPage() {
                   </Typography>
                 </Box>
               </Paper>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </CardContent>
       </Card>
     </Box>

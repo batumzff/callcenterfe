@@ -316,7 +316,11 @@ export default function ContactTable({ projectId }: ContactTableProps) {
               {contact.retellData.callAnalysis && (
                 <div>
                   <h4 className="font-medium text-gray-700">Arama Analizi</h4>
-                  <p className="whitespace-pre-wrap">{contact.retellData.callAnalysis.call_summary}</p>
+                  <p className="whitespace-pre-wrap">
+                    {contact.retellData.callAnalysis.call_summary 
+                      ? truncateSummary(contact.retellData.callAnalysis.call_summary, 200)
+                      : 'Arama özeti bulunmuyor.'}
+                  </p>
                   <p>Duygu Analizi: {contact.retellData.callAnalysis.user_sentiment}</p>
                   <p>Başarılı: {contact.retellData.callAnalysis.call_successful ? 'Evet' : 'Hayır'}</p>
                   <p>Sesli Mesaj: {contact.retellData.callAnalysis.in_voicemail ? 'Evet' : 'Hayır'}</p>

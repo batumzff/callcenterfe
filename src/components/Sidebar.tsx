@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 const menu = [
   { name: "Dashboard", path: "/dashboard" },
   { name: "Projeler", path: "/projects" },
-  { name: "Arama Başlat", path: "/calls" },
+  { name: "Agentler", path: "/agents" },
   { name: "Ayarlar", path: "/settings" },
 ];
 

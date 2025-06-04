@@ -3,10 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const menu = [
-  { name: "Dashboard", path: "/dashboard" },
   { name: "Projeler", path: "/projects" },
-  { name: "Agentler", path: "/agents" },
-  { name: "Ayarlar", path: "/settings" },
+  { name: "Agentlar", path: "/agents" },
 ];
 
 export default function Sidebar() {

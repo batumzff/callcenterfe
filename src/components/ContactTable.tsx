@@ -1,11 +1,102 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Contact, contactService } from '@/services/contactService';
+import ContactInput from './ContactInput';
 
 interface ContactTableProps {
   projectId: string;
 }
+
+// Tablo satırı bileşeni
+const CustomerRow = memo(({ 
+  customer, 
+  selectedCustomers, 
+  onCustomerSelect, 
+  onDeleteClick, 
+  deletingCustomerId,
+  onShowDetails
+}: { 
+  customer: Contact;
+  selectedCustomers: Contact[];
+  onCustomerSelect: (customer: Contact) => void;
+  onDeleteClick: (customer: Contact) => void;
+  deletingCustomerId: string | null;
+  onShowDetails: (customer: Contact) => void;
+}) => {
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        <input
+          type="checkbox"
+          checked={selectedCustomers.some(c => c.phoneNumber === customer.phoneNumber)}
+          onChange={() => onCustomerSelect(customer)}
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+        />
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        {customer.name}
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        {customer.phoneNumber}
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap">
+        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+          ${customer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+            customer.status === 'completed' ? 'bg-green-100 text-green-800' : 
+            customer.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+            'bg-red-100 text-red-800'}`}>
+          {customer.status === 'pending' ? 'Beklemede' : 
+           customer.status === 'completed' ? 'Tamamlandı' : 
+           customer.status === 'processing' ? 'İşleniyor' : 
+           'Başarısız'}
+        </span>
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap text-sm text-gray-500">
+        {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('tr-TR') : '-'}
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap text-sm">
+        {customer.retellData ? (
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 text-xs font-semibold rounded-full 
+              ${customer.retellData.callStatus === 'completed' ? 'bg-green-100 text-green-800' : 
+                customer.retellData.callStatus === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                customer.retellData.callStatus === 'failed' ? 'bg-red-100 text-red-800' :
+                'bg-gray-100 text-gray-800'}`}>
+              {customer.retellData.callStatus === 'completed' ? 'Tamamlandı' :
+               customer.retellData.callStatus === 'in_progress' ? 'Devam Ediyor' :
+               customer.retellData.callStatus === 'failed' ? 'Başarısız' :
+               'Beklemede'}
+            </span>
+            <button
+              onClick={() => onShowDetails(customer)}
+              className="text-blue-500 hover:text-blue-700 text-sm"
+            >
+              Detayları Gör
+            </button>
+          </div>
+        ) : (
+          <span className="text-gray-500">Görüşme yapılmadı</span>
+        )}
+      </td>
+      <td className="px-6 py-4 border-b whitespace-nowrap text-right text-sm font-medium">
+        <button
+          onClick={() => onDeleteClick(customer)}
+          disabled={deletingCustomerId === customer._id}
+          className="inline-flex items-center justify-center p-2 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {deletingCustomerId === customer._id ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
+      </td>
+    </tr>
+  );
+});
 
 export default function ContactTable({ projectId }: ContactTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(
@@ -15,6 +106,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       phoneNumber: ''
     }))
   );
+  const [formValues, setFormValues] = useState<{ [key: string]: { name: string; phoneNumber: string } }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -71,13 +163,15 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     loadContacts();
   }, [projectId, loadContacts]);
 
-  const handleInputChange = (id: string, field: 'name' | 'phoneNumber', value: string) => {
-    setContacts(prevContacts => 
-      prevContacts.map(contact => 
-        contact._id === id ? { ...contact, [field]: value } : contact
-      )
-    );
-  };
+  const handleInputChange = useCallback((id: string, field: 'name' | 'phoneNumber', value: string) => {
+    setFormValues(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value
+      }
+    }));
+  }, []);
 
   const addNewRow = () => {
     const newContact: Contact = {
@@ -89,10 +183,19 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   };
 
   const handleSave = async () => {
-    // Boş satırları filtrele
+    // Form değerlerini topla
     const validContacts = contacts
-      .filter(contact => contact.name.trim() && contact.phoneNumber.trim())
-      .map(({ name, phoneNumber }) => ({ name, phoneNumber }));
+      .filter(contact => {
+        const formValue = formValues[contact._id];
+        return formValue?.name?.trim() && formValue?.phoneNumber?.trim();
+      })
+      .map(contact => {
+        const formValue = formValues[contact._id];
+        return {
+          name: formValue.name.trim(),
+          phoneNumber: formValue.phoneNumber.trim()
+        };
+      });
     
     if (validContacts.length === 0) {
       setSaveError('Lütfen en az bir kişi bilgisi giriniz.');
@@ -113,6 +216,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
         name: '',
         phoneNumber: ''
       })));
+      setFormValues({});
 
       // Kaydedilen verileri yeniden yükle
       await loadContacts();
@@ -193,6 +297,17 @@ export default function ContactTable({ projectId }: ContactTableProps) {
             return customer;
           });
 
+          // Tüm aramaların durumunu kontrol et
+          const allCallsCompleted = updatedCustomers.every(customer => 
+            customer.retellData?.callStatus === 'completed' || 
+            customer.retellData?.callStatus === 'failed'
+          );
+
+          if (allCallsCompleted) {
+            console.log('Tüm aramalar tamamlandı, polling durduruluyor...');
+            setIsPolling(false);
+          }
+
           console.log('Güncellenmiş müşteri listesi:', updatedCustomers);
           return updatedCustomers;
         });
@@ -215,7 +330,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     if (isPolling) {
       setPollingStartTime(Date.now());
       checkRetellData();
-      intervalId = setInterval(checkRetellData, 10000);
+      intervalId = setInterval(checkRetellData, 10000); // Her 10 saniyede bir kontrol et
       timeoutId = setTimeout(() => {
         console.log('5 dakika doldu, polling durduruluyor...');
         setIsPolling(false);
@@ -258,14 +373,13 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     setCallSuccess(false);
 
     try {
-      // Sadece seçili müşterilerin telefon numaralarını gönder
-      const selectedPhoneNumbers = selectedCustomers.map(c => c.phoneNumber);
-      console.log('Arama yapılacak telefon numaraları:', selectedPhoneNumbers);
-
       await contactService.startCalls(selectedCustomers);
       setCallSuccess(true);
       setSelectedCustomers([]);
       setIsPolling(true);
+      
+      // Hemen ilk kontrolü yap
+      setTimeout(checkRetellData, 2000);
     } catch (error) {
       setCallError('Arama başlatılırken bir hata oluştu. Lütfen tekrar deneyiniz.');
       console.error('Arama hatası:', error);
@@ -317,9 +431,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                 <div>
                   <h4 className="font-medium text-gray-700">Arama Analizi</h4>
                   <p className="whitespace-pre-wrap">
-                    {contact.retellData.callAnalysis.call_summary 
-                      ? truncateSummary(contact.retellData.callAnalysis.call_summary, 200)
-                      : 'Arama özeti bulunmuyor.'}
+                    {contact.retellData.callAnalysis.call_summary || 'Arama özeti bulunmuyor.'}
                   </p>
                   <p>Duygu Analizi: {contact.retellData.callAnalysis.user_sentiment}</p>
                   <p>Başarılı: {contact.retellData.callAnalysis.call_successful ? 'Evet' : 'Hayır'}</p>
@@ -447,80 +559,18 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     );
   };
 
-  // Tablo satırını güncelle
-  const renderCustomerRow = (customer: Contact) => {
-    console.log('Müşteri render ediliyor:', customer);
-    return (
-      <tr key={customer._id} className="hover:bg-gray-50">
-        <td className="px-6 py-4 border-b whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={selectedCustomers.some(c => c.phoneNumber === customer.phoneNumber)}
-            onChange={() => handleCustomerSelect(customer)}
-            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-          />
-        </td>
-        <td className="px-6 py-4 border-b whitespace-nowrap">
-          {customer.name}
-        </td>
-        <td className="px-6 py-4 border-b whitespace-nowrap">
-          {customer.phoneNumber}
-        </td>
-        <td className="px-6 py-4 border-b whitespace-nowrap">
-          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-            ${customer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-              customer.status === 'completed' ? 'bg-green-100 text-green-800' : 
-              customer.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-              'bg-red-100 text-red-800'}`}>
-            {customer.status === 'pending' ? 'Beklemede' : 
-             customer.status === 'completed' ? 'Tamamlandı' : 
-             customer.status === 'processing' ? 'İşleniyor' : 
-             'Başarısız'}
-          </span>
-        </td>
-        <td className="px-6 py-4 border-b whitespace-nowrap text-sm text-gray-500">
-          {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('tr-TR') : '-'}
-        </td>
-        {customer.retellData && (
-          <td className="px-6 py-4 border-b whitespace-nowrap text-sm">
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 text-xs font-semibold rounded-full 
-                ${customer.retellData.callStatus === 'completed' ? 'bg-green-100 text-green-800' : 
-                  customer.retellData.callStatus === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                  customer.retellData.callStatus === 'failed' ? 'bg-red-100 text-red-800' :
-                  'bg-gray-100 text-gray-800'}`}>
-                {customer.retellData.callStatus === 'completed' ? 'Tamamlandı' :
-                 customer.retellData.callStatus === 'in_progress' ? 'Devam Ediyor' :
-                 customer.retellData.callStatus === 'failed' ? 'Başarısız' :
-                 'Beklemede'}
-              </span>
-              <button
-                onClick={() => setSelectedCallDetails(customer)}
-                className="text-blue-500 hover:text-blue-700 text-sm"
-              >
-                Detayları Gör
-              </button>
-            </div>
-          </td>
-        )}
-        <td className="px-6 py-4 border-b whitespace-nowrap text-right text-sm font-medium">
-          <button
-            onClick={() => handleDeleteClick(customer)}
-            disabled={deletingCustomerId === customer._id}
-            className="inline-flex items-center justify-center p-2 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {deletingCustomerId === customer._id ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            )}
-          </button>
-        </td>
-      </tr>
-    );
-  };
+  // Ana bileşende renderCustomerRow fonksiyonunu güncelle
+  const renderCustomerRow = (customer: Contact) => (
+    <CustomerRow
+      key={customer._id}
+      customer={customer}
+      selectedCustomers={selectedCustomers}
+      onCustomerSelect={handleCustomerSelect}
+      onDeleteClick={handleDeleteClick}
+      deletingCustomerId={deletingCustomerId}
+      onShowDetails={setSelectedCallDetails}
+    />
+  );
 
   return (
     <div className="w-full">
@@ -696,21 +746,20 @@ export default function ContactTable({ projectId }: ContactTableProps) {
             {contacts.map((contact) => (
               <tr key={contact._id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 border-b">
-                  <input
-                    type="text"
-                    value={contact.name}
-                    onChange={(e) => handleInputChange(contact._id, 'name', e.target.value)}
-                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  <ContactInput
+                    id={contact._id}
+                    value={formValues[contact._id]?.name || ''}
+                    onChange={handleInputChange}
                     placeholder="İsim giriniz"
                   />
                 </td>
                 <td className="px-6 py-4 border-b">
-                  <input
-                    type="tel"
-                    value={contact.phoneNumber}
-                    onChange={(e) => handleInputChange(contact._id, 'phoneNumber', e.target.value)}
-                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  <ContactInput
+                    id={contact._id}
+                    value={formValues[contact._id]?.phoneNumber || ''}
+                    onChange={handleInputChange}
                     placeholder="Telefon numarası giriniz"
+                    type="tel"
                   />
                 </td>
               </tr>

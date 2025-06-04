@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useRef, useEffect, useState } from 'react';
+import { memo, useState } from 'react';
 
 interface ContactInputProps {
   id: string;

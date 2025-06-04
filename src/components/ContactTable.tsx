@@ -98,6 +98,8 @@ const CustomerRow = memo(({
   );
 });
 
+CustomerRow.displayName = 'CustomerRow';
+
 export default function ContactTable({ projectId }: ContactTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(
     Array(2).fill(null).map((_, index) => ({
@@ -386,12 +388,6 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     } finally {
       setIsCalling(false);
     }
-  };
-
-  // Özeti kısaltma fonksiyonu
-  const truncateSummary = (summary: string, maxLength: number = 100) => {
-    if (summary.length <= maxLength) return summary;
-    return summary.substring(0, maxLength) + '...';
   };
 
   // Modal bileşeni

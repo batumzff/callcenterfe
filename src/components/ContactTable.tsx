@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { Contact, contactService } from '@/services/contactService';
 import ContactInput from './ContactInput';
 

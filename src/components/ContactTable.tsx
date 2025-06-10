@@ -570,12 +570,12 @@ export default function ContactTable({ projectId }: ContactTableProps) {
 
   return (
     <div className="w-full">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">İletişim Bilgileri</h2>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-2 mb-4 w-full md:flex-row md:items-center md:justify-between">
+        <h2 className="text-xl font-semibold mb-2 md:mb-0">İletişim Bilgileri</h2>
+        <div className="flex flex-col gap-2 w-full md:flex-row md:w-auto">
           <button
             onClick={checkSavedCustomers}
-            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded flex items-center gap-2"
+            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded flex items-center gap-2 w-full md:w-auto"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
@@ -584,7 +584,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           </button>
           <button
             onClick={addNewRow}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 w-full md:w-auto"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -594,7 +594,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
           >
             {isSaving ? (
               <>

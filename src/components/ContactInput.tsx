@@ -26,12 +26,26 @@ const ContactInput = memo(({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalValue(e.target.value);
+    const newValue = e.target.value;
+    
+    if (type === 'tel') {
+      // Sadece sayısal değerlere izin ver
+      const numericValue = newValue.replace(/[^0-9]/g, '');
+      
+      // Maksimum 10 karakter (Türkiye telefon numarası için)
+      if (numericValue.length <= 10) {
+        setLocalValue(numericValue);
+      }
+    } else {
+      setLocalValue(newValue);
+    }
   };
 
   return (
     <input
-      type={type}
+      type={type === 'tel' ? 'text' : type}
+      inputMode={type === 'tel' ? 'numeric' : 'text'}
+      pattern={type === 'tel' ? '[0-9]*' : undefined}
       name={`${id}-${field}`}
       value={localValue}
       onChange={handleChange}

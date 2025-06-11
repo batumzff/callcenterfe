@@ -16,6 +16,10 @@ import {
   Button,
   TextField,
   Alert,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
 } from '@mui/material';
 
 export default function AgentDetailPage() {
@@ -27,6 +31,7 @@ export default function AgentDetailPage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState('');
 
   useEffect(() => {
     const fetchAgentDetails = async () => {
@@ -47,6 +52,8 @@ export default function AgentDetailPage() {
         const result = await response.json();
         if (!result.data) throw new Error('No agent data received');
         setAgent(result.data);
+        setSelectedModel(result.data.post_call_analysis_model || '');
+        console.log('Agent Info:', result.data);
         // LLM içeriğini ayrıca çek
         const llmId = result.data.response_engine?.llm_id;
         if (llmId) {
@@ -84,6 +91,8 @@ export default function AgentDetailPage() {
       const token = authService.getToken();
       const llmId = agent?.response_engine?.llm_id;
       if (!llmId) throw new Error('LLM ID bulunamadı.');
+      const body = { general_prompt: llmContent, model: selectedModel };
+      console.log('Model update PATCH body:', body);
       const response = await fetch(`${API_BASE_URL}/retell/llms/${llmId}`, {
         method: 'PATCH',
         headers: {
@@ -92,7 +101,7 @@ export default function AgentDetailPage() {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         credentials: 'include',
-        body: JSON.stringify({ general_prompt: llmContent }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         const errorText = await response.text();
@@ -138,6 +147,26 @@ export default function AgentDetailPage() {
                 <Typography variant="h6" gutterBottom>
                   Welcome Message / LLM İçeriği
                 </Typography>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel id="model-select-label">Model Seçimi</InputLabel>
+                  <Select
+                    labelId="model-select-label"
+                    id="model-select"
+                    value={selectedModel}
+                    label="Model Seçimi"
+                    onChange={e => setSelectedModel(e.target.value)}
+                  >
+                    <MenuItem value="gpt-4o">gpt-4o</MenuItem>
+                    <MenuItem value="gpt-4o-mini">gpt-4o-mini</MenuItem>
+                    <MenuItem value="gpt-4.1">gpt-4.1</MenuItem>
+                    <MenuItem value="gpt-4.1-mini">gpt-4.1-mini</MenuItem>
+                    <MenuItem value="gpt-4.1-nano">gpt-4.1-nano</MenuItem>
+                    <MenuItem value="claude-3.7-sonnet">claude-3.7-sonnet</MenuItem>
+                    <MenuItem value="claude-3.5-haiku">claude-3.5-haiku</MenuItem>
+                    <MenuItem value="gemini-2.0-flash">gemini-2.0-flash</MenuItem>
+                    <MenuItem value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</MenuItem>
+                  </Select>
+                </FormControl>
                 <TextField
                   label="Welcome Message"
                   multiline

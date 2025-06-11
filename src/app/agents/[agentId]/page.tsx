@@ -32,6 +32,7 @@ export default function AgentDetailPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('');
 
   useEffect(() => {
     const fetchAgentDetails = async () => {
@@ -53,6 +54,7 @@ export default function AgentDetailPage() {
         if (!result.data) throw new Error('No agent data received');
         setAgent(result.data);
         setSelectedModel(result.data.post_call_analysis_model || '');
+        setSelectedLanguage(result.data.language || '');
         console.log('Agent Info:', result.data);
         // LLM içeriğini ayrıca çek
         const llmId = result.data.response_engine?.llm_id;
@@ -91,7 +93,7 @@ export default function AgentDetailPage() {
       const token = authService.getToken();
       const llmId = agent?.response_engine?.llm_id;
       if (!llmId) throw new Error('LLM ID bulunamadı.');
-      const body = { general_prompt: llmContent, model: selectedModel };
+      const body = { general_prompt: llmContent, model: selectedModel, language: selectedLanguage, agent_id: agent?.agent_id };
       console.log('Model update PATCH body:', body);
       const response = await fetch(`${API_BASE_URL}/retell/llms/${llmId}`, {
         method: 'PATCH',
@@ -165,6 +167,51 @@ export default function AgentDetailPage() {
                     <MenuItem value="claude-3.5-haiku">claude-3.5-haiku</MenuItem>
                     <MenuItem value="gemini-2.0-flash">gemini-2.0-flash</MenuItem>
                     <MenuItem value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel id="language-select-label">Dil Seçimi</InputLabel>
+                  <Select
+                    labelId="language-select-label"
+                    id="language-select"
+                    value={selectedLanguage}
+                    label="Dil Seçimi"
+                    onChange={e => setSelectedLanguage(e.target.value)}
+                  >
+                    <MenuItem value="en-US">🇺🇸 en-US</MenuItem>
+                    <MenuItem value="en-IN">🇮🇳 en-IN</MenuItem>
+                    <MenuItem value="en-GB">🇬🇧 en-GB</MenuItem>
+                    <MenuItem value="en-AU">🇦🇺 en-AU</MenuItem>
+                    <MenuItem value="en-NZ">🇳🇿 en-NZ</MenuItem>
+                    <MenuItem value="de-DE">🇩🇪 de-DE</MenuItem>
+                    <MenuItem value="es-ES">🇪🇸 es-ES</MenuItem>
+                    <MenuItem value="es-419">🇲🇽 es-419</MenuItem>
+                    <MenuItem value="hi-IN">🇮🇳 hi-IN</MenuItem>
+                    <MenuItem value="fr-FR">🇫🇷 fr-FR</MenuItem>
+                    <MenuItem value="fr-CA">🇨🇦 fr-CA</MenuItem>
+                    <MenuItem value="ja-JP">🇯🇵 ja-JP</MenuItem>
+                    <MenuItem value="pt-PT">🇵🇹 pt-PT</MenuItem>
+                    <MenuItem value="pt-BR">🇧🇷 pt-BR</MenuItem>
+                    <MenuItem value="zh-CN">🇨🇳 zh-CN</MenuItem>
+                    <MenuItem value="ru-RU">🇷🇺 ru-RU</MenuItem>
+                    <MenuItem value="it-IT">🇮🇹 it-IT</MenuItem>
+                    <MenuItem value="ko-KR">🇰🇷 ko-KR</MenuItem>
+                    <MenuItem value="nl-NL">🇳🇱 nl-NL</MenuItem>
+                    <MenuItem value="pl-PL">🇵🇱 pl-PL</MenuItem>
+                    <MenuItem value="tr-TR">🇹🇷 tr-TR</MenuItem>
+                    <MenuItem value="vi-VN">🇻🇳 vi-VN</MenuItem>
+                    <MenuItem value="ro-RO">🇷🇴 ro-RO</MenuItem>
+                    <MenuItem value="bg-BG">🇧🇬 bg-BG</MenuItem>
+                    <MenuItem value="ca-ES">🇪🇸 ca-ES</MenuItem>
+                    <MenuItem value="da-DK">🇩🇰 da-DK</MenuItem>
+                    <MenuItem value="fi-FI">🇫🇮 fi-FI</MenuItem>
+                    <MenuItem value="el-GR">🇬🇷 el-GR</MenuItem>
+                    <MenuItem value="hu-HU">🇭🇺 hu-HU</MenuItem>
+                    <MenuItem value="id-ID">🇮🇩 id-ID</MenuItem>
+                    <MenuItem value="no-NO">🇳🇴 no-NO</MenuItem>
+                    <MenuItem value="sk-SK">🇸🇰 sk-SK</MenuItem>
+                    <MenuItem value="sv-SE">🇸🇪 sv-SE</MenuItem>
+                    <MenuItem value="multi">🌐 multi</MenuItem>
                   </Select>
                 </FormControl>
                 <TextField

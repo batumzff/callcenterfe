@@ -158,15 +158,17 @@ export default function AgentDetailPage() {
                     label="Model Seçimi"
                     onChange={e => setSelectedModel(e.target.value)}
                   >
-                    <MenuItem value="gpt-4o">gpt-4o</MenuItem>
-                    <MenuItem value="gpt-4o-mini">gpt-4o-mini</MenuItem>
-                    <MenuItem value="gpt-4.1">gpt-4.1</MenuItem>
-                    <MenuItem value="gpt-4.1-mini">gpt-4.1-mini</MenuItem>
-                    <MenuItem value="gpt-4.1-nano">gpt-4.1-nano</MenuItem>
-                    <MenuItem value="claude-3.7-sonnet">claude-3.7-sonnet</MenuItem>
-                    <MenuItem value="claude-3.5-haiku">claude-3.5-haiku</MenuItem>
-                    <MenuItem value="gemini-2.0-flash">gemini-2.0-flash</MenuItem>
-                    <MenuItem value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</MenuItem>
+                    <MenuItem value="gpt-4.1">GPT 4.1 ($0.045/min)</MenuItem>
+                    <MenuItem value="gpt-4.1-mini">GPT 4.1 mini ($0.016/min)</MenuItem>
+                    <MenuItem value="gpt-4.1-nano">GPT 4.1 nano ($0.004/min)</MenuItem>
+                    <MenuItem value="gpt-4o">GPT 4o ($0.05/min)</MenuItem>
+                    <MenuItem value="gpt-4o-mini">GPT 4o mini ($0.006/min)</MenuItem>
+                    <MenuItem value="gpt-4o-realtime">GPT 4o Realtime ($0.5/min)</MenuItem>
+                    <MenuItem value="gpt-4o-mini-realtime">GPT 4o mini Realtime ($0.125/min)</MenuItem>
+                    <MenuItem value="claude-3.7-sonnet">Claude 3.7 Sonnet ($0.06/min)</MenuItem>
+                    <MenuItem value="claude-3.5-haiku">Claude 3.5 Haiku ($0.02/min)</MenuItem>
+                    <MenuItem value="gemini-2.0-flash">Gemini 2.0 Flash ($0.006/min)</MenuItem>
+                    <MenuItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite ($0.003/min)</MenuItem>
                   </Select>
                 </FormControl>
                 <FormControl fullWidth sx={{ mb: 2 }}>
@@ -178,40 +180,40 @@ export default function AgentDetailPage() {
                     label="Dil Seçimi"
                     onChange={e => setSelectedLanguage(e.target.value)}
                   >
-                    <MenuItem value="en-US">🇺🇸 en-US</MenuItem>
-                    <MenuItem value="en-IN">🇮🇳 en-IN</MenuItem>
-                    <MenuItem value="en-GB">🇬🇧 en-GB</MenuItem>
-                    <MenuItem value="en-AU">🇦🇺 en-AU</MenuItem>
-                    <MenuItem value="en-NZ">🇳🇿 en-NZ</MenuItem>
-                    <MenuItem value="de-DE">🇩🇪 de-DE</MenuItem>
-                    <MenuItem value="es-ES">🇪🇸 es-ES</MenuItem>
-                    <MenuItem value="es-419">🇲🇽 es-419</MenuItem>
-                    <MenuItem value="hi-IN">🇮🇳 hi-IN</MenuItem>
-                    <MenuItem value="fr-FR">🇫🇷 fr-FR</MenuItem>
-                    <MenuItem value="fr-CA">🇨🇦 fr-CA</MenuItem>
-                    <MenuItem value="ja-JP">🇯🇵 ja-JP</MenuItem>
-                    <MenuItem value="pt-PT">🇵🇹 pt-PT</MenuItem>
-                    <MenuItem value="pt-BR">🇧🇷 pt-BR</MenuItem>
-                    <MenuItem value="zh-CN">🇨🇳 zh-CN</MenuItem>
-                    <MenuItem value="ru-RU">🇷🇺 ru-RU</MenuItem>
-                    <MenuItem value="it-IT">🇮🇹 it-IT</MenuItem>
-                    <MenuItem value="ko-KR">🇰🇷 ko-KR</MenuItem>
-                    <MenuItem value="nl-NL">🇳🇱 nl-NL</MenuItem>
-                    <MenuItem value="pl-PL">🇵🇱 pl-PL</MenuItem>
-                    <MenuItem value="tr-TR">🇹🇷 tr-TR</MenuItem>
-                    <MenuItem value="vi-VN">🇻🇳 vi-VN</MenuItem>
-                    <MenuItem value="ro-RO">🇷🇴 ro-RO</MenuItem>
-                    <MenuItem value="bg-BG">🇧🇬 bg-BG</MenuItem>
-                    <MenuItem value="ca-ES">🇪🇸 ca-ES</MenuItem>
-                    <MenuItem value="da-DK">🇩🇰 da-DK</MenuItem>
-                    <MenuItem value="fi-FI">🇫🇮 fi-FI</MenuItem>
-                    <MenuItem value="el-GR">🇬🇷 el-GR</MenuItem>
-                    <MenuItem value="hu-HU">🇭🇺 hu-HU</MenuItem>
-                    <MenuItem value="id-ID">🇮🇩 id-ID</MenuItem>
-                    <MenuItem value="no-NO">🇳🇴 no-NO</MenuItem>
-                    <MenuItem value="sk-SK">🇸🇰 sk-SK</MenuItem>
-                    <MenuItem value="sv-SE">🇸🇪 sv-SE</MenuItem>
-                    <MenuItem value="multi">🌐 multi</MenuItem>
+                    <MenuItem value="en-US">🇺🇸 English (US)</MenuItem>
+                    <MenuItem value="en-IN">🇮🇳 English (India)</MenuItem>
+                    <MenuItem value="en-GB">🇬🇧 English (UK)</MenuItem>
+                    <MenuItem value="en-AU">🇦🇺 English (Australia)</MenuItem>
+                    <MenuItem value="en-NZ">🇳🇿 English (New Zealand)</MenuItem>
+                    <MenuItem value="de-DE">🇩🇪 German</MenuItem>
+                    <MenuItem value="es-ES">🇪🇸 Spanish (Spain)</MenuItem>
+                    <MenuItem value="es-419">🇲🇽 Spanish (Latin America)</MenuItem>
+                    <MenuItem value="hi-IN">🇮🇳 Hindi</MenuItem>
+                    <MenuItem value="fr-FR">🇫🇷 French (France)</MenuItem>
+                    <MenuItem value="fr-CA">🇨🇦 French (Canada)</MenuItem>
+                    <MenuItem value="ja-JP">🇯🇵 Japanese</MenuItem>
+                    <MenuItem value="pt-PT">🇵🇹 Portuguese (Portugal)</MenuItem>
+                    <MenuItem value="pt-BR">🇧🇷 Portuguese (Brazil)</MenuItem>
+                    <MenuItem value="zh-CN">🇨🇳 Chinese (Simplified)</MenuItem>
+                    <MenuItem value="ru-RU">🇷🇺 Russian</MenuItem>
+                    <MenuItem value="it-IT">🇮🇹 Italian</MenuItem>
+                    <MenuItem value="ko-KR">🇰🇷 Korean</MenuItem>
+                    <MenuItem value="nl-NL">🇳🇱 Dutch</MenuItem>
+                    <MenuItem value="pl-PL">🇵🇱 Polish</MenuItem>
+                    <MenuItem value="tr-TR">🇹🇷 Turkish</MenuItem>
+                    <MenuItem value="vi-VN">🇻🇳 Vietnamese</MenuItem>
+                    <MenuItem value="ro-RO">🇷🇴 Romanian</MenuItem>
+                    <MenuItem value="bg-BG">🇧🇬 Bulgarian</MenuItem>
+                    <MenuItem value="ca-ES">🇪🇸 Catalan</MenuItem>
+                    <MenuItem value="da-DK">🇩🇰 Danish</MenuItem>
+                    <MenuItem value="fi-FI">🇫🇮 Finnish</MenuItem>
+                    <MenuItem value="el-GR">🇬🇷 Greek</MenuItem>
+                    <MenuItem value="hu-HU">🇭🇺 Hungarian</MenuItem>
+                    <MenuItem value="id-ID">🇮🇩 Indonesian</MenuItem>
+                    <MenuItem value="no-NO">🇳🇴 Norwegian</MenuItem>
+                    <MenuItem value="sk-SK">🇸🇰 Slovak</MenuItem>
+                    <MenuItem value="sv-SE">🇸🇪 Swedish</MenuItem>
+                    <MenuItem value="multi">🌐 Multi-language</MenuItem>
                   </Select>
                 </FormControl>
                 <TextField

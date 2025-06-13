@@ -277,6 +277,14 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       console.log('Retell verileri kontrol ediliyor...');
       const updatedContacts = await contactService.getRetellData(projectId);
       console.log('Gelen retell verileri:', updatedContacts);
+      updatedContacts.forEach((contact, idx) => {
+        console.log(`Müşteri #${idx + 1}:`, {
+          name: contact.name,
+          phoneNumber: contact.phoneNumber,
+          retellData: contact.retellData,
+          callAnalysis: contact.retellData?.callAnalysis
+        });
+      });
       
       if (updatedContacts.length > 0) {
         console.log('Güncellenecek müşteri sayısı:', updatedContacts.length);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
-import { Contact, ContactWithLastCall, CallDetail, contactService } from '@/services/contactService';
+import { Contact, ContactWithLastCall, contactService } from '@/services/contactService';
 import ContactInput from './ContactInput';
 
 interface ContactTableProps {

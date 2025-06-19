@@ -1,6 +1,31 @@
 import { API_BASE_URL } from '@/config/api';
 import { authService } from './auth';
 
+// Yeni CallDetail interface'i
+export interface CallDetail {
+  _id: string;
+  customerId: string;
+  projectId: string;
+  callId: string;
+  callStatus: string;
+  transcript?: string;
+  recordingUrl?: string;
+  callAnalysis?: {
+    call_summary?: string;
+    user_sentiment?: string;
+    call_successful?: boolean;
+    in_voicemail?: boolean;
+    custom_analysis_data?: {
+      note?: string;
+      result?: string;
+    };
+  };
+  duration?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Güncellenmiş Contact interface'i - retellData kaldırıldı
 export interface Contact {
   _id: string;
   name: string;
@@ -17,25 +42,12 @@ export interface Contact {
   }>;
   createdAt?: string;
   updatedAt?: string;
-  retellData?: {
-    callId?: string;
-    callStatus?: string;
-    transcript?: string;
-    recordingUrl?: string;
-    callAnalysis?: {
-      call_summary?: string;
-      user_sentiment?: string;
-      call_successful?: boolean;
-      in_voicemail?: boolean;
-    };
-    custom_analysis_data?: {
-      lastUpdated?: string;
-    };
-    duration?: number;
-    summary?: string;
-    status?: string;
-    updatedAt?: string;
-  };
+  // retellData kaldırıldı - artık ayrı bir CallDetail objesi olarak geliyor
+}
+
+// Müşteri listesi için kullanılacak interface - son çağrı detayı ile birlikte
+export interface ContactWithLastCall extends Contact {
+  lastCallDetail?: CallDetail;
 }
 
 interface ApiResponse<T> {
@@ -55,6 +67,7 @@ const getHeaders = () => {
 
 class ContactService {
   private baseUrl = `${API_BASE_URL}/customers`;
+  private callDetailsUrl = `${API_BASE_URL}/call-details`;
 
   async saveContacts(projectId: string, contacts: Omit<Contact, '_id'>[]): Promise<Contact[]> {
     try {
@@ -98,6 +111,56 @@ class ContactService {
     }
   }
 
+  // Yeni: Müşteri listesi ile çağrı detaylarını birlikte getir
+  async getContactsWithCallDetails(projectId: string): Promise<ContactWithLastCall[]> {
+    try {
+      console.log('Müşteri verileri ve çağrı detayları için API çağrısı yapılıyor:', `${this.baseUrl}/call-details?projectId=${projectId}`);
+      
+      const response = await fetch(`${this.baseUrl}/call-details?projectId=${projectId}`, {
+        headers: getHeaders(),
+        credentials: 'include',
+        mode: 'cors',
+      });
+
+      console.log('API yanıt durumu:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API hata yanıtı:', errorText);
+        throw new Error(`Failed to fetch contacts with call details: ${response.status} ${response.statusText}`);
+      }
+
+      const result: ApiResponse<ContactWithLastCall[]> = await response.json();
+      console.log('API yanıt verisi (ham):', result);
+      
+      if (result.status === 'error') {
+        console.error('API hata durumu:', result.message);
+        throw new Error(result.message || 'Failed to fetch contacts with call details');
+      }
+
+      if (!result.data) {
+        console.warn('API yanıtında veri bulunamadı:', result);
+        return [];
+      }
+
+      console.log('İşlenmiş müşteri verileri:', result.data.map(contact => ({
+        id: contact._id,
+        name: contact.name,
+        phoneNumber: contact.phoneNumber,
+        status: contact.status,
+        lastCallDetail: contact.lastCallDetail,
+        createdAt: contact.createdAt,
+        updatedAt: contact.updatedAt
+      })));
+
+      return result.data;
+    } catch (error) {
+      console.error('Müşteri verileri alınırken hata:', error);
+      throw error;
+    }
+  }
+
+  // Eski getContacts metodu - geriye uyumluluk için korundu
   async getContacts(projectId: string): Promise<Contact[]> {
     try {
       console.log('Müşteri verileri için API çağrısı yapılıyor:', `${this.baseUrl}?projectId=${projectId}`);
@@ -133,7 +196,6 @@ class ContactService {
         name: contact.name,
         phoneNumber: contact.phoneNumber,
         status: contact.status,
-        retellData: contact.retellData,
         createdAt: contact.createdAt,
         updatedAt: contact.updatedAt
       })));
@@ -141,6 +203,82 @@ class ContactService {
       return result.data;
     } catch (error) {
       console.error('Müşteri verileri alınırken hata:', error);
+      throw error;
+    }
+  }
+
+  // Yeni: Belirli bir müşterinin çağrı detaylarını getir
+  async getCallDetailsForCustomer(customerId: string): Promise<CallDetail[]> {
+    try {
+      console.log('Müşteri çağrı detayları için API çağrısı yapılıyor:', `${this.callDetailsUrl}/customer/${customerId}`);
+      const response = await fetch(`${this.callDetailsUrl}/customer/${customerId}`, {
+        headers: getHeaders(),
+        credentials: 'include',
+        mode: 'cors',
+      });
+
+      console.log('API yanıt durumu:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API hata yanıtı:', errorText);
+        throw new Error(`Failed to fetch call details: ${response.status} ${response.statusText}`);
+      }
+
+      const result: ApiResponse<CallDetail[]> = await response.json();
+      console.log('API yanıt verisi:', result);
+      
+      if (result.status === 'error') {
+        console.error('API hata durumu:', result.message);
+        throw new Error(result.message || 'Failed to fetch call details');
+      }
+
+      if (!result.data) {
+        console.warn('API yanıtında veri bulunamadı:', result);
+        return [];
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Çağrı detayları alınırken hata:', error);
+      throw error;
+    }
+  }
+
+  // Yeni: Proje için tüm çağrı detaylarını getir
+  async getCallDetailsForProject(projectId: string): Promise<CallDetail[]> {
+    try {
+      console.log('Proje çağrı detayları için API çağrısı yapılıyor:', `${this.callDetailsUrl}/project/${projectId}`);
+      const response = await fetch(`${this.callDetailsUrl}/project/${projectId}`, {
+        headers: getHeaders(),
+        credentials: 'include',
+        mode: 'cors',
+      });
+
+      console.log('API yanıt durumu:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API hata yanıtı:', errorText);
+        throw new Error(`Failed to fetch project call details: ${response.status} ${response.statusText}`);
+      }
+
+      const result: ApiResponse<CallDetail[]> = await response.json();
+      console.log('API yanıt verisi:', result);
+      
+      if (result.status === 'error') {
+        console.error('API hata durumu:', result.message);
+        throw new Error(result.message || 'Failed to fetch project call details');
+      }
+
+      if (!result.data) {
+        console.warn('API yanıtında veri bulunamadı:', result);
+        return [];
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Proje çağrı detayları alınırken hata:', error);
       throw error;
     }
   }
@@ -250,50 +388,35 @@ class ContactService {
     }
   }
 
-  async getRetellData(projectId: string): Promise<Contact[]> {
+  // Test endpoint'i - tüm müşterileri getir (projectId olmadan)
+  async testGetAllCustomers(): Promise<Contact[]> {
     try {
-      console.log('Retell verileri için API çağrısı yapılıyor:', `${this.baseUrl}/retell-data?projectId=${projectId}`);
-      const response = await fetch(`${this.baseUrl}/retell-data?projectId=${projectId}`, {
+      console.log('Test endpoint çağrılıyor: /api/customers/test-data');
+      const response = await fetch(`${this.baseUrl}/test-data`, {
         headers: getHeaders(),
         credentials: 'include',
+        mode: 'cors',
       });
 
-      console.log('API yanıt durumu:', response.status);
+      console.log('Test API yanıt durumu:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API hata yanıtı:', errorText);
-        throw new Error(`Failed to fetch retell data: ${response.status} ${response.statusText}`);
+        console.error('Test API hata yanıtı:', errorText);
+        throw new Error(`Failed to fetch test data: ${response.status} ${response.statusText}`);
       }
 
       const result: ApiResponse<Contact[]> = await response.json();
-      console.log('API yanıt verisi:', result);
+      console.log('Test API yanıt verisi:', result);
       
       if (result.status === 'error') {
-        console.error('API hata durumu:', result.message);
-        throw new Error(result.message || 'Failed to fetch retell data');
+        console.error('Test API hata durumu:', result.message);
+        throw new Error(result.message || 'Failed to fetch test data');
       }
 
-      if (!result.data) {
-        console.warn('API yanıtında veri bulunamadı:', result);
-        return [];
-      }
-
-      // Her bir müşteri için retell verilerini işle
-      const processedData = result.data.map(contact => {
-        console.log('İşlenen müşteri verisi:', {
-          name: contact.name,
-          phoneNumber: contact.phoneNumber,
-          status: contact.status,
-          retellData: contact.retellData
-        });
-        return contact;
-      });
-
-      console.log('İşlenmiş retell verileri:', processedData);
-      return processedData;
+      return result.data || [];
     } catch (error) {
-      console.error('Retell verileri alınırken hata:', error);
+      console.error('Test endpoint hatası:', error);
       throw error;
     }
   }

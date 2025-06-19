@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
-import { Contact, contactService } from '@/services/contactService';
+import { Contact, ContactWithLastCall, CallDetail, contactService } from '@/services/contactService';
 import ContactInput from './ContactInput';
 
 interface ContactTableProps {
@@ -17,12 +17,12 @@ const CustomerRow = memo(({
   deletingCustomerId,
   onShowDetails
 }: { 
-  customer: Contact;
-  selectedCustomers: Contact[];
-  onCustomerSelect: (customer: Contact) => void;
-  onDeleteClick: (customer: Contact) => void;
+  customer: ContactWithLastCall;
+  selectedCustomers: ContactWithLastCall[];
+  onCustomerSelect: (customer: ContactWithLastCall) => void;
+  onDeleteClick: (customer: ContactWithLastCall) => void;
   deletingCustomerId: string | null;
-  onShowDetails: (customer: Contact) => void;
+  onShowDetails: (customer: ContactWithLastCall) => void;
 }) => {
   return (
     <tr className="hover:bg-gray-50">
@@ -56,16 +56,16 @@ const CustomerRow = memo(({
         {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('tr-TR') : '-'}
       </td>
       <td className="px-6 py-4 border-b whitespace-nowrap text-sm">
-        {customer.retellData ? (
+        {customer.lastCallDetail ? (
           <div className="flex items-center gap-2">
             <span className={`px-2 py-1 text-xs font-semibold rounded-full 
-              ${customer.retellData.callStatus === 'completed' ? 'bg-green-100 text-green-800' : 
-                customer.retellData.callStatus === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                customer.retellData.callStatus === 'failed' ? 'bg-red-100 text-red-800' :
+              ${customer.lastCallDetail.callStatus === 'completed' ? 'bg-green-100 text-green-800' : 
+                customer.lastCallDetail.callStatus === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                customer.lastCallDetail.callStatus === 'failed' ? 'bg-red-100 text-red-800' :
                 'bg-gray-100 text-gray-800'}`}>
-              {customer.retellData.callStatus === 'completed' ? 'Tamamlandı' :
-               customer.retellData.callStatus === 'in_progress' ? 'Devam Ediyor' :
-               customer.retellData.callStatus === 'failed' ? 'Başarısız' :
+              {customer.lastCallDetail.callStatus === 'completed' ? 'Tamamlandı' :
+               customer.lastCallDetail.callStatus === 'in_progress' ? 'Devam Ediyor' :
+               customer.lastCallDetail.callStatus === 'failed' ? 'Başarısız' :
                'Beklemede'}
             </span>
             <button
@@ -112,45 +112,61 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [savedCustomers, setSavedCustomers] = useState<Contact[]>([]);
-  const [selectedCustomers, setSelectedCustomers] = useState<Contact[]>([]);
+  const [savedCustomers, setSavedCustomers] = useState<ContactWithLastCall[]>([]);
+  const [selectedCustomers, setSelectedCustomers] = useState<ContactWithLastCall[]>([]);
   const [isCalling, setIsCalling] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
   const [callSuccess, setCallSuccess] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
   const MAX_POLLING_DURATION = 5 * 60 * 1000; // 5 dakika
-  const [selectedCallDetails, setSelectedCallDetails] = useState<Contact | null>(null);
+  const [selectedCallDetails, setSelectedCallDetails] = useState<ContactWithLastCall | null>(null);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
+  const [contactToDelete, setContactToDelete] = useState<ContactWithLastCall | null>(null);
 
   const loadContacts = useCallback(async () => {
     try {
       console.log('Mevcut müşteriler yükleniyor...');
       console.log('Project ID:', projectId);
       
-      const savedContacts = await contactService.getContacts(projectId);
+      // Önce test endpoint'ini dene
+      console.log('Test endpoint deneniyor...');
+      const testCustomers = await contactService.testGetAllCustomers();
+      console.log('Test endpoint sonucu:', testCustomers.length, 'müşteri');
+      
+      // Yeni API kullanımı: getContactsWithCallDetails
+      const savedContacts = await contactService.getContactsWithCallDetails(projectId);
       console.log('API\'den gelen ham veri:', savedContacts);
       
-      if (savedContacts && Array.isArray(savedContacts)) {
+      if (savedContacts && Array.isArray(savedContacts) && savedContacts.length > 0) {
         console.log('Müşteri sayısı:', savedContacts.length);
         console.log('Müşteri detayları:', savedContacts.map(contact => ({
           _id: contact._id,
           name: contact.name,
           phoneNumber: contact.phoneNumber,
           status: contact.status,
-          retellData: contact.retellData,
+          lastCallDetail: contact.lastCallDetail,
           createdAt: contact.createdAt,
           updatedAt: contact.updatedAt
         })));
         
+        console.log('State\'e kaydedilecek veriler:', savedContacts);
         setSavedCustomers(savedContacts);
+        console.log('State güncellendi, savedCustomers length:', savedContacts.length);
       } else {
-        console.warn('Geçersiz veri formatı:', savedContacts);
-        setSavedCustomers([]);
+        console.log('Call-details endpoint boş döndürdü, test verilerini kullanıyorum...');
+        // Test verilerini kullan ve lastCallDetail'i undefined olarak ayarla
+        const customersWithCallDetails = testCustomers.map(customer => ({
+          ...customer,
+          lastCallDetail: undefined
+        }));
+        
+        console.log('Test verilerinden oluşturulan müşteriler:', customersWithCallDetails);
+        setSavedCustomers(customersWithCallDetails);
+        console.log('State güncellendi, savedCustomers length:', customersWithCallDetails.length);
       }
     } catch (error) {
       console.error('Müşteriler yüklenirken hata:', error);
@@ -164,16 +180,6 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   useEffect(() => {
     loadContacts();
   }, [projectId, loadContacts]);
-
-  const handleInputChange = useCallback((id: string, field: 'name' | 'phoneNumber', value: string) => {
-    setFormValues(prev => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value
-      }
-    }));
-  }, []);
 
   const addNewRow = () => {
     const newContact: Contact = {
@@ -198,9 +204,9 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           phoneNumber: formValue.phoneNumber.trim()
         };
       });
-    
+
     if (validContacts.length === 0) {
-      setSaveError('Lütfen en az bir kişi bilgisi giriniz.');
+      setSaveError('En az bir geçerli müşteri bilgisi gerekli.');
       return;
     }
 
@@ -209,58 +215,34 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     setSaveSuccess(false);
 
     try {
-      await contactService.saveContacts(projectId, validContacts);
-      setSaveSuccess(true);
+      console.log('Kaydedilecek müşteriler:', validContacts);
+      const savedContacts = await contactService.saveContacts(projectId, validContacts);
+      console.log('Kaydedilen müşteriler:', savedContacts);
       
-      // Başarılı kayıttan sonra formu temizle
-      setContacts(Array(2).fill(null).map((_, index) => ({
-        _id: `contact-${Date.now()}-${index}`,
-        name: '',
-        phoneNumber: ''
-      })));
+      setSaveSuccess(true);
+      setContacts([{ _id: `contact-${Date.now()}-0`, name: '', phoneNumber: '' }]);
       setFormValues({});
-
-      // Kaydedilen verileri yeniden yükle
+      
+      // Müşteri listesini yenile
       await loadContacts();
+      
+      // 3 saniye sonra başarı mesajını kaldır
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3000);
     } catch (error) {
-      setSaveError('Kişiler kaydedilirken bir hata oluştu. Lütfen tekrar deneyiniz.');
-      console.error('Kaydetme hatası:', error);
+      console.error('Müşteri kaydetme hatası:', error);
+      if (error instanceof Error) {
+        setSaveError(error.message);
+      } else {
+        setSaveError('Müşteri kaydedilirken bir hata oluştu.');
+      }
     } finally {
       setIsSaving(false);
     }
   };
 
-  const checkSavedCustomers = useCallback(async () => {
-    try {
-      console.log('Müşteriler yükleniyor...');
-      const customers = await contactService.getContacts(projectId);
-      console.log('Gelen müşteriler:', customers);
-      
-      if (customers.length > 0) {
-        setSavedCustomers(customers);
-        console.log('State güncellendi, savedCustomers:', customers);
-      } else {
-        console.log('Gelen müşteri listesi boş');
-        setSavedCustomers([]);
-      }
-    } catch (error) {
-      console.error('Müşteriler yüklenirken hata:', error);
-      setSavedCustomers([]);
-    }
-  }, [projectId]);
-
-  // Sayfa yüklendiğinde müşterileri otomatik yükle
-  useEffect(() => {
-    checkSavedCustomers();
-  }, [projectId, checkSavedCustomers]);
-
-  const handleCustomerSelect = (customer: Contact) => {
-    console.log('Müşteri seçimi değişiyor:', {
-      name: customer.name,
-      phoneNumber: customer.phoneNumber,
-      currentSelection: selectedCustomers.map(c => c.phoneNumber)
-    });
-
+  const handleCustomerSelect = (customer: ContactWithLastCall) => {
     setSelectedCustomers(prev => {
       const isSelected = prev.some(c => c.phoneNumber === customer.phoneNumber);
       if (isSelected) {
@@ -271,230 +253,263 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     });
   };
 
-  // Retell verilerini kontrol et
-  const checkRetellData = useCallback(async () => {
+  const handleSelectAll = () => {
+    if (selectedCustomers.length === savedCustomers.length) {
+      setSelectedCustomers([]);
+    } else {
+      setSelectedCustomers([...savedCustomers]);
+    }
+  };
+
+  // Yeni: Çağrı detaylarını kontrol etmek için güncellenmiş metod
+  const checkCallDetails = useCallback(async () => {
     try {
-      console.log('Retell verileri kontrol ediliyor...');
-      const updatedContacts = await contactService.getRetellData(projectId);
-      console.log('Gelen retell verileri:', updatedContacts);
-      updatedContacts.forEach((contact, idx) => {
-        console.log(`Müşteri #${idx + 1}:`, {
-          name: contact.name,
-          phoneNumber: contact.phoneNumber,
-          retellData: contact.retellData,
-          callAnalysis: contact.retellData?.callAnalysis
+      console.log('Çağrı detayları kontrol ediliyor...');
+      
+      // Yeni API kullanımı: getCallDetailsForProject
+      const callDetails = await contactService.getCallDetailsForProject(projectId);
+      console.log('Güncel çağrı detayları:', callDetails);
+      
+      // Müşteri listesini güncelle
+      const updatedCustomers = await contactService.getContactsWithCallDetails(projectId);
+      
+      setSavedCustomers(prevCustomers => {
+        return prevCustomers.map(customer => {
+          const updatedCustomer = updatedCustomers.find(uc => uc._id === customer._id);
+          if (updatedCustomer) {
+            console.log('Müşteri güncellendi:', {
+              name: updatedCustomer.name,
+              lastCallDetail: updatedCustomer.lastCallDetail
+            });
+            return updatedCustomer;
+          }
+          return customer;
         });
       });
-      
-      if (updatedContacts.length > 0) {
-        console.log('Güncellenecek müşteri sayısı:', updatedContacts.length);
-        setSavedCustomers(prevCustomers => {
-          const updatedCustomers = prevCustomers.map(customer => {
-            const updatedContact = updatedContacts.find(c => c.phoneNumber === customer.phoneNumber);
-            if (updatedContact) {
-              console.log('Müşteri güncelleniyor:', {
-                phoneNumber: customer.phoneNumber,
-                oldStatus: customer.status,
-                newStatus: updatedContact.status,
-                retellData: updatedContact.retellData
-              });
-              return {
-                ...customer,
-                status: updatedContact.status,
-                retellData: updatedContact.retellData
-              };
-            }
-            return customer;
-          });
 
-          // Tüm aramaların durumunu kontrol et
-          const allCallsCompleted = updatedCustomers.every(customer => 
-            customer.retellData?.callStatus === 'completed' || 
-            customer.retellData?.callStatus === 'failed'
-          );
-
-          if (allCallsCompleted) {
-            console.log('Tüm aramalar tamamlandı, polling durduruluyor...');
-            setIsPolling(false);
+      // Seçili müşterileri de güncelle
+      setSelectedCustomers(prevSelected => {
+        return prevSelected.map(selectedCustomer => {
+          const updatedCustomer = updatedCustomers.find(uc => uc._id === selectedCustomer._id);
+          if (updatedCustomer) {
+            return updatedCustomer;
           }
-
-          console.log('Güncellenmiş müşteri listesi:', updatedCustomers);
-          return updatedCustomers;
+          return selectedCustomer;
         });
-      } else {
-        console.log('Güncellenecek yeni veri bulunamadı');
+      });
+
+      // Tüm çağrılar tamamlandı mı kontrol et
+      const allCallsCompleted = updatedCustomers.every(customer => 
+        !customer.lastCallDetail || 
+        customer.lastCallDetail.callStatus === 'completed' ||
+        customer.lastCallDetail.callStatus === 'failed'
+      );
+
+      if (allCallsCompleted) {
+        console.log('Tüm çağrılar tamamlandı, polling durduruluyor.');
+        setIsPolling(false);
+        setPollingStartTime(null);
       }
     } catch (error) {
-      console.error('Retell verileri kontrol edilirken hata:', error);
-      if (error instanceof Error) {
-        console.error('Hata detayı:', error.message);
-      }
+      console.error('Çağrı detayları kontrol edilirken hata:', error);
     }
   }, [projectId]);
 
-  // Polling mekanizması
+  // Polling için useEffect
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
-    let timeoutId: NodeJS.Timeout;
 
     if (isPolling) {
-      setPollingStartTime(Date.now());
-      checkRetellData();
-      intervalId = setInterval(checkRetellData, 10000); // Her 10 saniyede bir kontrol et
-      timeoutId = setTimeout(() => {
-        console.log('5 dakika doldu, polling durduruluyor...');
-        setIsPolling(false);
-      }, MAX_POLLING_DURATION);
+      console.log('Polling başlatılıyor...');
+      checkCallDetails();
+      intervalId = setInterval(checkCallDetails, 10000); // Her 10 saniyede bir kontrol et
     }
 
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
       }
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
-  }, [isPolling, checkRetellData, MAX_POLLING_DURATION]);
+  }, [isPolling, checkCallDetails, MAX_POLLING_DURATION]);
 
-  // Polling durumunu izle
+  // Polling süresi kontrolü
   useEffect(() => {
-    if (!isPolling && pollingStartTime) {
-      const duration = Date.now() - pollingStartTime;
-      console.log(`Polling durdu. Toplam süre: ${Math.floor(duration / 1000)} saniye`);
+    if (pollingStartTime && Date.now() - pollingStartTime > MAX_POLLING_DURATION) {
+      console.log('Maksimum polling süresi aşıldı, polling durduruluyor.');
+      setIsPolling(false);
       setPollingStartTime(null);
     }
-  }, [isPolling, pollingStartTime]);
+  }, [pollingStartTime, MAX_POLLING_DURATION]);
 
-  // Arama başlatıldığında polling'i başlat
   const handleStartCalls = async () => {
     if (selectedCustomers.length === 0) {
-      setCallError('Lütfen en az bir müşteri seçiniz.');
+      setCallError('Lütfen en az bir müşteri seçin.');
       return;
     }
-
-    console.log('Seçili müşteriler:', selectedCustomers.map(c => ({
-      name: c.name,
-      phoneNumber: c.phoneNumber
-    })));
 
     setIsCalling(true);
     setCallError(null);
     setCallSuccess(false);
 
     try {
+      console.log('Seçili müşteriler için arama başlatılıyor:', selectedCustomers.map(c => c.name));
       await contactService.startCalls(selectedCustomers);
-      setCallSuccess(true);
-      setSelectedCustomers([]);
-      setIsPolling(true);
       
-      // Hemen ilk kontrolü yap
-      setTimeout(checkRetellData, 2000);
+      setCallSuccess(true);
+      setIsPolling(true);
+      setPollingStartTime(Date.now());
+      
+      // 2 saniye sonra çağrı detaylarını kontrol et
+      setTimeout(checkCallDetails, 2000);
+      
+      // 3 saniye sonra başarı mesajını kaldır
+      setTimeout(() => {
+        setCallSuccess(false);
+      }, 3000);
     } catch (error) {
-      setCallError('Arama başlatılırken bir hata oluştu. Lütfen tekrar deneyiniz.');
-      console.error('Arama hatası:', error);
+      console.error('Arama başlatma hatası:', error);
+      if (error instanceof Error) {
+        setCallError(error.message);
+      } else {
+        setCallError('Arama başlatılırken bir hata oluştu.');
+      }
     } finally {
       setIsCalling(false);
     }
   };
 
-  // Modal bileşeni
-  const CallDetailsModal = ({ contact, onClose }: { contact: Contact, onClose: () => void }) => (
+  // Çağrı detayları modal bileşeni
+  const CallDetailsModal = ({ contact, onClose }: { contact: ContactWithLastCall, onClose: () => void }) => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="text-xl font-semibold">Arama Detayları</h3>
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Çağrı Detayları - {contact.name}</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
         
-        <div className="space-y-4">
-          <div>
-            <h4 className="font-medium text-gray-700">Müşteri Bilgileri</h4>
-            <p>İsim: {contact.name}</p>
-            <p>Telefon: {contact.phoneNumber}</p>
-          </div>
-
-          {contact.retellData && (
-            <>
-              <div>
-                <h4 className="font-medium text-gray-700">Arama Durumu</h4>
-                <p>Durum: {contact.retellData.callStatus}</p>
-                {contact.retellData.duration && (
-                  <p>Süre: {Math.floor(contact.retellData.duration / 60)}:{(contact.retellData.duration % 60).toString().padStart(2, '0')}</p>
-                )}
-              </div>
-
-              {contact.retellData.callAnalysis && (
-                <div>
-                  <h4 className="font-medium text-gray-700">Arama Analizi</h4>
-                  <p className="whitespace-pre-wrap">
-                    {contact.retellData.callAnalysis.call_summary || 'Arama özeti bulunmuyor.'}
-                  </p>
-                  <p>Duygu Analizi: {contact.retellData.callAnalysis.user_sentiment}</p>
-                  <p>Başarılı: {contact.retellData.callAnalysis.call_successful ? 'Evet' : 'Hayır'}</p>
-                  <p>Sesli Mesaj: {contact.retellData.callAnalysis.in_voicemail ? 'Evet' : 'Hayır'}</p>
-                </div>
-              )}
-
-              {contact.retellData.recordingUrl && (
-                <div>
-                  <h4 className="font-medium text-gray-700">Kayıt</h4>
-                  <a 
-                    href={contact.retellData.recordingUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700"
-                  >
-                    Kaydı Dinle
-                  </a>
-                </div>
-              )}
-
-              {contact.retellData.custom_analysis_data?.lastUpdated && (
-                <p className="text-sm text-gray-500">
-                  Son Güncelleme: {new Date(contact.retellData.custom_analysis_data.lastUpdated).toLocaleString('tr-TR')}
+        {contact.lastCallDetail && (
+          <div className="space-y-4">
+            <div className="border-b pb-4">
+              <p className="font-semibold">Çağrı Durumu:</p>
+              <p className="text-gray-700">{contact.lastCallDetail.callStatus}</p>
+            </div>
+            
+            {contact.lastCallDetail.duration && (
+              <div className="border-b pb-4">
+                <p className="font-semibold">Süre:</p>
+                <p className="text-gray-700">
+                  {Math.floor(contact.lastCallDetail.duration / 60)}:{(contact.lastCallDetail.duration % 60).toString().padStart(2, '0')}
                 </p>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            )}
+            
+            {contact.lastCallDetail.callAnalysis && (
+              <div className="border-b pb-4">
+                <p className="font-semibold">Arama Analizi:</p>
+                <div className="mt-2 space-y-2">
+                  <p className="text-gray-700">
+                    <span className="font-medium">Özet:</span> {contact.lastCallDetail.callAnalysis.call_summary || 'Arama özeti bulunmuyor.'}
+                  </p>
+                  <p className="text-gray-700">
+                    <span className="font-medium">Duygu Analizi:</span> {contact.lastCallDetail.callAnalysis.user_sentiment}
+                  </p>
+                  <p className="text-gray-700">
+                    <span className="font-medium">Başarılı:</span> {contact.lastCallDetail.callAnalysis.call_successful ? 'Evet' : 'Hayır'}
+                  </p>
+                  <p className="text-gray-700">
+                    <span className="font-medium">Sesli Mesaj:</span> {contact.lastCallDetail.callAnalysis.in_voicemail ? 'Evet' : 'Hayır'}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {contact.lastCallDetail.recordingUrl && (
+              <div className="border-b pb-4">
+                <p className="font-semibold">Kayıt:</p>
+                <a
+                  href={contact.lastCallDetail.recordingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline"
+                >
+                  Kaydı Dinle
+                </a>
+              </div>
+            )}
+            
+            {contact.lastCallDetail.callAnalysis?.custom_analysis_data && (
+              <div className="border-b pb-4">
+                <p className="font-semibold">Özel Analiz:</p>
+                <div className="mt-2 space-y-2">
+                  {contact.lastCallDetail.callAnalysis.custom_analysis_data.note && (
+                    <p className="text-gray-700">
+                      <span className="font-medium">Not:</span> {contact.lastCallDetail.callAnalysis.custom_analysis_data.note}
+                    </p>
+                  )}
+                  {contact.lastCallDetail.callAnalysis.custom_analysis_data.result && (
+                    <p className="text-gray-700">
+                      <span className="font-medium">Sonuç:</span> {contact.lastCallDetail.callAnalysis.custom_analysis_data.result}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {contact.lastCallDetail.updatedAt && (
+              <div>
+                <p className="font-semibold">Son Güncelleme:</p>
+                <p className="text-gray-700">
+                  {new Date(contact.lastCallDetail.updatedAt).toLocaleString('tr-TR')}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {!contact.lastCallDetail && (
+          <p className="text-gray-500">Bu müşteri için henüz çağrı detayı bulunmuyor.</p>
+        )}
       </div>
     </div>
   );
 
-  const handleDeleteClick = (customer: Contact) => {
+  const handleDeleteClick = (customer: ContactWithLastCall) => {
     setContactToDelete(customer);
     setDeleteModalOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!contactToDelete?._id) {
-      console.error('Geçersiz ID:', contactToDelete);
-      setDeleteError('Geçersiz müşteri ID\'si.');
-      return;
-    }
+    if (!contactToDelete) return;
 
     setDeletingCustomerId(contactToDelete._id);
     setDeleteError(null);
     setDeleteSuccess(false);
 
     try {
-      console.log('API çağrısı yapılıyor...');
       await contactService.deleteContact(contactToDelete._id);
-      console.log('Silme işlemi başarılı');
+      
       setDeleteSuccess(true);
-      // Silinen müşteriyi listeden kaldır
       setSavedCustomers(prev => prev.filter(c => c._id !== contactToDelete._id));
+      setSelectedCustomers(prev => prev.filter(c => c._id !== contactToDelete._id));
+      
+      // 3 saniye sonra başarı mesajını kaldır
+      setTimeout(() => {
+        setDeleteSuccess(false);
+      }, 3000);
     } catch (error) {
-      console.error('Silme hatası:', error);
-      setDeleteError('Müşteri silinirken bir hata oluştu. Lütfen tekrar deneyiniz.');
+      console.error('Müşteri silme hatası:', error);
+      if (error instanceof Error) {
+        setDeleteError(error.message);
+      } else {
+        setDeleteError('Müşteri silinirken bir hata oluştu.');
+      }
     } finally {
       setDeletingCustomerId(null);
       setDeleteModalOpen(false);
@@ -502,69 +517,50 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     }
   };
 
-  // Silme Onay Modalı
-  const DeleteConfirmationModal = () => {
-    if (!deleteModalOpen || !contactToDelete) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="text-xl font-semibold text-gray-900">Müşteri Silme</h3>
-            <button
-              onClick={() => {
-                setDeleteModalOpen(false);
-                setContactToDelete(null);
-              }}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+  // Silme onay modal bileşeni
+  const DeleteConfirmationModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex items-center mb-4">
+          <div className="flex-shrink-0">
+            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
           </div>
-          
-          <div className="mb-6">
-            <p className="text-gray-600">
-              <span className="font-medium">{contactToDelete.name}</span> isimli müşteriyi silmek istediğinizden emin misiniz?
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              Bu işlem geri alınamaz.
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => {
-                setDeleteModalOpen(false);
-                setContactToDelete(null);
-              }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              İptal
-            </button>
-            <button
-              onClick={handleDeleteConfirm}
-              disabled={deletingCustomerId === contactToDelete._id}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {deletingCustomerId === contactToDelete._id ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Siliniyor...
-                </div>
-              ) : (
-                'Sil'
-              )}
-            </button>
+          <div className="ml-3">
+            <h3 className="text-lg font-medium text-gray-900">Müşteriyi Sil</h3>
           </div>
         </div>
+        <div className="mt-2">
+          <p className="text-sm text-gray-500">
+            <strong>{contactToDelete?.name}</strong> adlı müşteriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+          </p>
+        </div>
+        <div className="mt-4 flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteModalOpen(false);
+              setContactToDelete(null);
+            }}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+          >
+            İptal
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteConfirm}
+            disabled={deletingCustomerId === contactToDelete?._id}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deletingCustomerId === contactToDelete?._id ? 'Siliniyor...' : 'Sil'}
+          </button>
+        </div>
       </div>
-    );
-  };
+    </div>
+  );
 
-  // Ana bileşende renderCustomerRow fonksiyonunu güncelle
-  const renderCustomerRow = (customer: Contact) => (
+  const renderCustomerRow = (customer: ContactWithLastCall) => (
     <CustomerRow
       key={customer._id}
       customer={customer}
@@ -577,211 +573,172 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   );
 
   return (
-    <div className="w-full">
-      <div className="flex flex-col gap-2 mb-4 w-full md:flex-row md:items-center md:justify-between">
-        <h2 className="text-xl font-semibold mb-2 md:mb-0">İletişim Bilgileri</h2>
-        <div className="flex flex-col gap-2 w-full md:flex-row md:w-auto">
-          <button
-            onClick={checkSavedCustomers}
-            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded flex items-center gap-2 w-full md:w-auto"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            Kayıtlı Müşterileri Kontrol Et
-          </button>
-          <button
-            onClick={addNewRow}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 w-full md:w-auto"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Yeni Satır Ekle
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
-          >
-            {isSaving ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Kaydediliyor...
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                Kaydet
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {saveError && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{saveError}</p>
-        </div>
-      )}
-
+    <div className="space-y-6">
+      {/* Başarı ve hata mesajları */}
       {saveSuccess && (
-        <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          <p>Kişiler başarıyla kaydedildi!</p>
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+          Müşteriler başarıyla kaydedildi!
         </div>
       )}
-
-      {callError && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{callError}</p>
+      
+      {saveError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {saveError}
         </div>
       )}
-
+      
       {callSuccess && (
-        <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          <p>Aramalar başarıyla başlatıldı!</p>
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+          Aramalar başarıyla başlatıldı!
         </div>
       )}
-
-      {deleteError && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{deleteError}</p>
+      
+      {callError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {callError}
         </div>
       )}
-
+      
       {deleteSuccess && (
-        <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          <p>Müşteri başarıyla silindi!</p>
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+          Müşteri başarıyla silindi!
+        </div>
+      )}
+      
+      {deleteError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {deleteError}
         </div>
       )}
 
-      {/* Kayıtlı Müşteriler Tablosu */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Kayıtlı Müşteriler</h3>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">
-              {savedCustomers.length} müşteri bulundu
-            </span>
-            {isPolling && (
-              <span className="text-sm text-blue-500 flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                Görüşme durumu güncelleniyor...
-              </span>
-            )}
+      {/* Müşteri Ekleme Formu */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-lg font-semibold mb-4">Yeni Müşteri Ekle</h2>
+        <div className="space-y-4">
+          {contacts.map((contact, index) => (
+            <ContactInput
+              key={contact._id}
+              id={contact._id}
+              name={formValues[contact._id]?.name || ''}
+              phoneNumber={formValues[contact._id]?.phoneNumber || ''}
+              onNameChange={(value) => {
+                setFormValues(prev => ({
+                  ...prev,
+                  [contact._id]: {
+                    ...prev[contact._id],
+                    name: value
+                  }
+                }));
+              }}
+              onPhoneNumberChange={(value) => {
+                setFormValues(prev => ({
+                  ...prev,
+                  [contact._id]: {
+                    ...prev[contact._id],
+                    phoneNumber: value
+                  }
+                }));
+              }}
+              onRemove={() => {
+                if (contacts.length > 1) {
+                  setContacts(contacts.filter((_, i) => i !== index));
+                  const newFormValues = { ...formValues };
+                  delete newFormValues[contact._id];
+                  setFormValues(newFormValues);
+                }
+              }}
+              canRemove={contacts.length > 1}
+            />
+          ))}
+          <div className="flex justify-between">
             <button
-              onClick={handleStartCalls}
-              disabled={isCalling || selectedCustomers.length === 0}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={addNewRow}
+              className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-500"
             >
-              {isCalling ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Aramalar Başlatılıyor...
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                  </svg>
-                  Arama Yap ({selectedCustomers.length})
-                </>
-              )}
+              + Başka Müşteri Ekle
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Müşteri Listesi */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Müşteri Listesi</h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={handleSelectAll}
+                className="px-3 py-1 text-sm text-indigo-600 hover:text-indigo-500"
+              >
+                {selectedCustomers.length === savedCustomers.length ? 'Seçimi Kaldır' : 'Tümünü Seç'}
+              </button>
+              <button
+                onClick={handleStartCalls}
+                disabled={selectedCustomers.length === 0 || isCalling || isPolling}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCalling ? 'Başlatılıyor...' : isPolling ? 'Aramalar Devam Ediyor...' : 'Arama Başlat'}
+              </button>
+            </div>
+          </div>
+        </div>
+        
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Seç
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={selectedCustomers.length === savedCustomers.length && savedCustomers.length > 0}
+                    onChange={handleSelectAll}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
                 </th>
-                <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İsim
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ad Soyad
                 </th>
-                <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Telefon Numarası
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Telefon
                 </th>
-                <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Durum
                 </th>
-                <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Kayıt Tarihi
                 </th>
-                <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Görüşme Detayları
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Çağrı Durumu
                 </th>
-                <th className="px-6 py-3 border-b text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   İşlemler
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {savedCustomers && savedCustomers.length > 0 ? (
-                savedCustomers.map(renderCustomerRow)
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                    Henüz kayıtlı müşteri bulunmuyor
-                  </td>
-                </tr>
-              )}
+            <tbody className="bg-white divide-y divide-gray-200">
+              {savedCustomers.map(renderCustomerRow)}
             </tbody>
           </table>
         </div>
       </div>
-      
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-200">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                İsim
-              </th>
-              <th className="px-6 py-3 border-b text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Telefon Numarası
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.map((contact) => (
-              <tr key={contact._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 border-b">
-                  <ContactInput
-                    id={contact._id}
-                    value={formValues[contact._id]?.name || ''}
-                    onChange={handleInputChange}
-                    placeholder="İsim giriniz"
-                  />
-                </td>
-                <td className="px-6 py-4 border-b">
-                  <ContactInput
-                    id={contact._id}
-                    value={formValues[contact._id]?.phoneNumber || ''}
-                    onChange={handleInputChange}
-                    placeholder="Telefon numarası giriniz"
-                    type="tel"
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      {/* Modal */}
+      {/* Modaller */}
       {selectedCallDetails && (
         <CallDetailsModal
           contact={selectedCallDetails}
           onClose={() => setSelectedCallDetails(null)}
         />
       )}
-
-      {/* Silme Onay Modalı */}
-      <DeleteConfirmationModal />
+      
+      {deleteModalOpen && <DeleteConfirmationModal />}
     </div>
   );
 } 

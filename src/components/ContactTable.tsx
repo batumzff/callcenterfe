@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Contact, ContactWithLastCall, contactService, getHeaders } from '@/services/contactService';
 import ContactInput from './ContactInput';
-import { useRouter } from 'next/navigation';
 
 interface ContactTableProps {
   projectId: string;
@@ -159,9 +158,6 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const [showAllCustomersModal, setShowAllCustomersModal] = useState(false);
   const [customerModalError, setCustomerModalError] = useState<string | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
-  const router = useRouter();
-
-  const getId = (id: any) => (typeof id === 'object' && id.$oid ? id.$oid : id);
 
   const loadContacts = useCallback(async () => {
     try {
@@ -174,7 +170,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           let projectCallDetail = undefined;
           try {
             projectCallDetail = await getCallDetailForCustomerAndProject(customer._id, projectId);
-          } catch (err) {
+          } catch (_err) {
             // 404 veya başka hata olursa, lastCallDetail undefined kalsın
           }
           return {
@@ -184,12 +180,12 @@ export default function ContactTable({ projectId }: ContactTableProps) {
         })
       );
       // id/_id normalize et
-      const normalizedCustomers = customersWithProjectCallDetail.map((c: any) => ({
+      const normalizedCustomers = customersWithProjectCallDetail.map((c: ContactWithLastCall) => ({
         ...c,
-        _id: c._id || c.id,
+        _id: c._id,
       }));
       setSavedCustomers(normalizedCustomers);
-    } catch (error) {
+    } catch (_error) {
       setSavedCustomers([]);
     }
   }, [projectId]);
@@ -599,17 +595,12 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       const data = await res.json();
       setAllCustomers(data.data || []);
       setShowAllCustomersModal(true);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setAllCustomers([]);
       setShowAllCustomersModal(true);
-      setCustomerModalError(e?.message || 'Kayıtlı müşteri listesi alınamadı.');
+      const errorMessage = e instanceof Error ? e.message : 'Kayıtlı müşteri listesi alınamadı.';
+      setCustomerModalError(errorMessage);
     }
-  };
-
-  const addCustomerToProject = async (customerId: string) => {
-    await fetch(`/api/customers/${customerId}/project/${projectId}`, { method: 'POST' });
-    await loadContacts();
-    setShowAllCustomersModal(false);
   };
 
   return (

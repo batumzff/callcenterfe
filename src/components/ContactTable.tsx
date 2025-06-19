@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
-import { Contact, ContactWithLastCall, contactService } from '@/services/contactService';
+import { Contact, ContactWithLastCall, contactService, getHeaders } from '@/services/contactService';
 import ContactInput from './ContactInput';
+import { useRouter } from 'next/navigation';
 
 interface ContactTableProps {
   projectId: string;
@@ -24,6 +25,21 @@ const CustomerRow = memo(({
   deletingCustomerId: string | null;
   onShowDetails: (customer: ContactWithLastCall) => void;
 }) => {
+  // Çağrı durumu etiketi
+  let callStatusLabel = 'Görüşme yapılmadı';
+  let callStatusClass = 'bg-gray-100 text-gray-800';
+  if (customer.lastCallDetail) {
+    if (customer.lastCallDetail.callStatus === 'ended' || customer.lastCallDetail.callAnalysis) {
+      callStatusLabel = 'Görüşme yapıldı';
+      callStatusClass = 'bg-green-100 text-green-800';
+    } else if (customer.lastCallDetail.callStatus === 'processing' || customer.lastCallDetail.callStatus === 'in_progress') {
+      callStatusLabel = 'İşleniyor';
+      callStatusClass = 'bg-blue-100 text-blue-800';
+    } else if (customer.lastCallDetail.callStatus === 'failed') {
+      callStatusLabel = 'Başarısız';
+      callStatusClass = 'bg-red-100 text-red-800';
+    }
+  }
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-6 py-4 border-b whitespace-nowrap">
@@ -41,15 +57,8 @@ const CustomerRow = memo(({
         {customer.phoneNumber}
       </td>
       <td className="px-6 py-4 border-b whitespace-nowrap">
-        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-          ${customer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-            customer.status === 'completed' ? 'bg-green-100 text-green-800' : 
-            customer.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-            'bg-red-100 text-red-800'}`}>
-          {customer.status === 'pending' ? 'Beklemede' : 
-           customer.status === 'completed' ? 'Tamamlandı' : 
-           customer.status === 'processing' ? 'İşleniyor' : 
-           'Başarısız'}
+        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${callStatusClass}`}>
+          {callStatusLabel}
         </span>
       </td>
       <td className="px-6 py-4 border-b whitespace-nowrap text-sm text-gray-500">
@@ -58,19 +67,9 @@ const CustomerRow = memo(({
       <td className="px-6 py-4 border-b whitespace-nowrap text-sm">
         {customer.lastCallDetail ? (
           <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 text-xs font-semibold rounded-full 
-              ${customer.lastCallDetail.callStatus === 'completed' ? 'bg-green-100 text-green-800' : 
-                customer.lastCallDetail.callStatus === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                customer.lastCallDetail.callStatus === 'failed' ? 'bg-red-100 text-red-800' :
-                'bg-gray-100 text-gray-800'}`}>
-              {customer.lastCallDetail.callStatus === 'completed' ? 'Tamamlandı' :
-               customer.lastCallDetail.callStatus === 'in_progress' ? 'Devam Ediyor' :
-               customer.lastCallDetail.callStatus === 'failed' ? 'Başarısız' :
-               'Beklemede'}
-            </span>
             <button
               onClick={() => onShowDetails(customer)}
-              className="text-blue-500 hover:text-blue-700 text-sm"
+              className="text-blue-500 hover:text-blue-700 text-sm underline"
             >
               Detayları Gör
             </button>
@@ -100,6 +99,36 @@ const CustomerRow = memo(({
 
 CustomerRow.displayName = 'CustomerRow';
 
+// Yeni fonksiyon: Belirli müşteri ve proje için call detail getir
+async function getCallDetailForCustomerAndProject(customerId: string, projectId: string) {
+  const response = await fetch(`/api/call-details/customer/${customerId}/project/${projectId}`, {
+    headers: getHeaders(),
+    credentials: 'include',
+    mode: 'cors',
+  });
+  const result = await response.json();
+  if (result.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
+    return result.data[0]; // En yenisi veya ilkini al
+  }
+  return undefined;
+}
+
+// Modal bileşeni
+function Modal({ children, onClose }: { children: React.ReactNode, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto relative">
+        <button onClick={onClose} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function ContactTable({ projectId }: ContactTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(
     Array(2).fill(null).map((_, index) => ({
@@ -126,53 +155,41 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<ContactWithLastCall | null>(null);
+  const [allCustomers, setAllCustomers] = useState<Contact[]>([]);
+  const [showAllCustomersModal, setShowAllCustomersModal] = useState(false);
+  const [customerModalError, setCustomerModalError] = useState<string | null>(null);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const router = useRouter();
+
+  const getId = (id: any) => (typeof id === 'object' && id.$oid ? id.$oid : id);
 
   const loadContacts = useCallback(async () => {
     try {
-      console.log('Mevcut müşteriler yükleniyor...');
-      console.log('Project ID:', projectId);
-      
-      // Önce test endpoint'ini dene
-      console.log('Test endpoint deneniyor...');
-      const testCustomers = await contactService.testGetAllCustomers();
-      console.log('Test endpoint sonucu:', testCustomers.length, 'müşteri');
-      
-      // Yeni API kullanımı: getContactsWithCallDetails
+      // Her zaman gerçek müşteri listesini çek
       const savedContacts = await contactService.getContactsWithCallDetails(projectId);
-      console.log('API\'den gelen ham veri:', savedContacts);
-      
-      if (savedContacts && Array.isArray(savedContacts) && savedContacts.length > 0) {
-        console.log('Müşteri sayısı:', savedContacts.length);
-        console.log('Müşteri detayları:', savedContacts.map(contact => ({
-          _id: contact._id,
-          name: contact.name,
-          phoneNumber: contact.phoneNumber,
-          status: contact.status,
-          lastCallDetail: contact.lastCallDetail,
-          createdAt: contact.createdAt,
-          updatedAt: contact.updatedAt
-        })));
-        
-        console.log('State\'e kaydedilecek veriler:', savedContacts);
-        setSavedCustomers(savedContacts);
-        console.log('State güncellendi, savedCustomers length:', savedContacts.length);
-      } else {
-        console.log('Call-details endpoint boş döndürdü, test verilerini kullanıyorum...');
-        // Test verilerini kullan ve lastCallDetail'i undefined olarak ayarla
-        const customersWithCallDetails = testCustomers.map(customer => ({
-          ...customer,
-          lastCallDetail: undefined
-        }));
-        
-        console.log('Test verilerinden oluşturulan müşteriler:', customersWithCallDetails);
-        setSavedCustomers(customersWithCallDetails);
-        console.log('State güncellendi, savedCustomers length:', customersWithCallDetails.length);
-      }
+
+      // Her müşteri için, ilgili projeye ait call detail'i yeni endpoint'ten çek
+      const customersWithProjectCallDetail = await Promise.all(
+        savedContacts.map(async (customer) => {
+          let projectCallDetail = undefined;
+          try {
+            projectCallDetail = await getCallDetailForCustomerAndProject(customer._id, projectId);
+          } catch (err) {
+            // 404 veya başka hata olursa, lastCallDetail undefined kalsın
+          }
+          return {
+            ...customer,
+            lastCallDetail: projectCallDetail
+          };
+        })
+      );
+      // id/_id normalize et
+      const normalizedCustomers = customersWithProjectCallDetail.map((c: any) => ({
+        ...c,
+        _id: c._id || c.id,
+      }));
+      setSavedCustomers(normalizedCustomers);
     } catch (error) {
-      console.error('Müşteriler yüklenirken hata:', error);
-      if (error instanceof Error) {
-        console.error('Hata detayı:', error.message);
-      }
       setSavedCustomers([]);
     }
   }, [projectId]);
@@ -393,14 +410,12 @@ export default function ContactTable({ projectId }: ContactTableProps) {
             </svg>
           </button>
         </div>
-        
-        {contact.lastCallDetail && (
+        {contact.lastCallDetail ? (
           <div className="space-y-4">
             <div className="border-b pb-4">
               <p className="font-semibold">Çağrı Durumu:</p>
-              <p className="text-gray-700">{contact.lastCallDetail.callStatus}</p>
+              <p className="text-gray-700">{contact.lastCallDetail.callStatus === 'ended' || contact.lastCallDetail.callAnalysis ? 'Görüşme yapıldı' : contact.lastCallDetail.callStatus === 'processing' || contact.lastCallDetail.callStatus === 'in_progress' ? 'İşleniyor' : contact.lastCallDetail.callStatus === 'failed' ? 'Başarısız' : 'Görüşme yapılmadı'}</p>
             </div>
-            
             {contact.lastCallDetail.duration && (
               <div className="border-b pb-4">
                 <p className="font-semibold">Süre:</p>
@@ -409,7 +424,6 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                 </p>
               </div>
             )}
-            
             {contact.lastCallDetail.callAnalysis && (
               <div className="border-b pb-4">
                 <p className="font-semibold">Arama Analizi:</p>
@@ -418,7 +432,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                     <span className="font-medium">Özet:</span> {contact.lastCallDetail.callAnalysis.call_summary || 'Arama özeti bulunmuyor.'}
                   </p>
                   <p className="text-gray-700">
-                    <span className="font-medium">Duygu Analizi:</span> {contact.lastCallDetail.callAnalysis.user_sentiment}
+                    <span className="font-medium">Duygu Analizi:</span> {contact.lastCallDetail.callAnalysis.user_sentiment || '-'}
                   </p>
                   <p className="text-gray-700">
                     <span className="font-medium">Başarılı:</span> {contact.lastCallDetail.callAnalysis.call_successful ? 'Evet' : 'Hayır'}
@@ -429,21 +443,6 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                 </div>
               </div>
             )}
-            
-            {contact.lastCallDetail.recordingUrl && (
-              <div className="border-b pb-4">
-                <p className="font-semibold">Kayıt:</p>
-                <a
-                  href={contact.lastCallDetail.recordingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 underline"
-                >
-                  Kaydı Dinle
-                </a>
-              </div>
-            )}
-            
             {contact.lastCallDetail.callAnalysis?.custom_analysis_data && (
               <div className="border-b pb-4">
                 <p className="font-semibold">Özel Analiz:</p>
@@ -461,7 +460,25 @@ export default function ContactTable({ projectId }: ContactTableProps) {
                 </div>
               </div>
             )}
-            
+            {contact.lastCallDetail.recordingUrl && (
+              <div className="border-b pb-4">
+                <p className="font-semibold">Kayıt:</p>
+                <a
+                  href={contact.lastCallDetail.recordingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline"
+                >
+                  Kaydı Dinle
+                </a>
+              </div>
+            )}
+            {contact.lastCallDetail.transcript && (
+              <div className="border-b pb-4">
+                <p className="font-semibold">Transkript:</p>
+                <pre className="text-gray-700 whitespace-pre-wrap bg-gray-50 rounded p-2 max-h-40 overflow-y-auto">{contact.lastCallDetail.transcript}</pre>
+              </div>
+            )}
             {contact.lastCallDetail.updatedAt && (
               <div>
                 <p className="font-semibold">Son Güncelleme:</p>
@@ -471,9 +488,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
               </div>
             )}
           </div>
-        )}
-        
-        {!contact.lastCallDetail && (
+        ) : (
           <p className="text-gray-500">Bu müşteri için henüz çağrı detayı bulunmuyor.</p>
         )}
       </div>
@@ -560,6 +575,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     </div>
   );
 
+  // Tablo satırlarını render eden fonksiyon
   const renderCustomerRow = (customer: ContactWithLastCall) => (
     <CustomerRow
       key={customer._id}
@@ -572,8 +588,39 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     />
   );
 
+  // Tablo renderı öncesi log
+  console.log('Tabloda gösterilecek müşteriler:', savedCustomers);
+
+  const fetchAllCustomers = async () => {
+    try {
+      setCustomerModalError(null);
+      const res = await fetch('/api/customers', { headers: getHeaders(), credentials: 'include', mode: 'cors' });
+      if (!res.ok) throw new Error('Yetkisiz veya hata oluştu');
+      const data = await res.json();
+      setAllCustomers(data.data || []);
+      setShowAllCustomersModal(true);
+    } catch (e: any) {
+      setAllCustomers([]);
+      setShowAllCustomersModal(true);
+      setCustomerModalError(e?.message || 'Kayıtlı müşteri listesi alınamadı.');
+    }
+  };
+
+  const addCustomerToProject = async (customerId: string) => {
+    await fetch(`/api/customers/${customerId}/project/${projectId}`, { method: 'POST' });
+    await loadContacts();
+    setShowAllCustomersModal(false);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Kayıtlı Müşterileri Listele Butonu */}
+      <button
+        onClick={fetchAllCustomers}
+        className="mb-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      >
+        Kayıtlı Müşterileri Listele
+      </button>
       {/* Başarı ve hata mesajları */}
       {saveSuccess && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
@@ -739,6 +786,62 @@ export default function ContactTable({ projectId }: ContactTableProps) {
       )}
       
       {deleteModalOpen && <DeleteConfirmationModal />}
+
+      {/* Kayıtlı Müşteriler Modalı */}
+      {showAllCustomersModal && (
+        <Modal onClose={() => setShowAllCustomersModal(false)}>
+          <h2 className="text-lg font-semibold mb-4">Kayıtlı Müşteriler</h2>
+          {customerModalError && (
+            <div className="mb-2 text-red-600">{customerModalError}</div>
+          )}
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-4 py-2 text-left">Seç</th>
+                <th className="px-4 py-2 text-left">Ad Soyad</th>
+                <th className="px-4 py-2 text-left">Telefon</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(allCustomers || []).map((c) => (
+                <tr key={c._id}>
+                  <td className="px-4 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedCustomerIds.includes(c._id)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setSelectedCustomerIds(prev => [...prev, c._id]);
+                        } else {
+                          setSelectedCustomerIds(prev => prev.filter(id => id !== c._id));
+                        }
+                      }}
+                    />
+                  </td>
+                  <td className="px-4 py-2">{c.name}</td>
+                  <td className="px-4 py-2">{c.phoneNumber}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-4 flex justify-end">
+            <button
+              disabled={selectedCustomerIds.length === 0}
+              onClick={async () => {
+                await Promise.all(selectedCustomerIds.map(id =>
+                  fetch(`/api/customers/${id}/project/${projectId}`, { method: 'POST', headers: getHeaders(), credentials: 'include', mode: 'cors' })
+                ));
+                setShowAllCustomersModal(false);
+                setSelectedCustomerIds([]);
+                await loadContacts();
+              }}
+              className={`px-4 py-2 rounded text-white ${selectedCustomerIds.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+            >
+              Seçili Müşterileri Projeye Ekle
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 } 

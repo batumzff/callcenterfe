@@ -56,7 +56,7 @@ interface ApiResponse<T> {
   message?: string;
 }
 
-const getHeaders = () => {
+export const getHeaders = () => {
   const token = authService.getToken();
   return {
     'Content-Type': 'application/json',

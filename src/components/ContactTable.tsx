@@ -170,7 +170,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
           let projectCallDetail = undefined;
           try {
             projectCallDetail = await getCallDetailForCustomerAndProject(customer._id, projectId);
-          } catch (_err) {
+          } catch {
             // 404 veya başka hata olursa, lastCallDetail undefined kalsın
           }
           return {
@@ -185,7 +185,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
         _id: c._id,
       }));
       setSavedCustomers(normalizedCustomers);
-    } catch (_error) {
+    } catch {
       setSavedCustomers([]);
     }
   }, [projectId]);

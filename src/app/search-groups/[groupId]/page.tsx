@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { searchGroupService, SearchGroup } from '@/services/searchGroupService';
-import { getHeaders } from '@/services/contactService';
+import { getHeaders, Contact } from '@/services/contactService';
 
 export default function SearchGroupDetailPage() {
   const params = useParams();
@@ -15,24 +15,25 @@ export default function SearchGroupDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
 
-  useEffect(() => {
-    if (groupId) {
-      loadGroupDetails();
-    }
-  }, [groupId]);
-
-  const loadGroupDetails = async () => {
+  const loadGroupDetails = useCallback(async () => {
     try {
       setLoading(true);
       const groupData = await searchGroupService.getSearchGroupById(groupId);
       setGroup(groupData);
       setCustomers(groupData.customers || []);
-    } catch (err) {
+    } catch (error) {
       setError('Grup detayları yüklenirken hata oluştu');
+      console.error('Grup detayları yükleme hatası:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [groupId]);
+
+  useEffect(() => {
+    if (groupId) {
+      loadGroupDetails();
+    }
+  }, [groupId, loadGroupDetails]);
 
   const handleRemoveCustomer = async (customerId: string) => {
     if (!confirm('Bu müşteriyi gruptan çıkarmak istediğinizden emin misiniz?')) {
@@ -42,8 +43,9 @@ export default function SearchGroupDetailPage() {
     try {
       await searchGroupService.removeCustomerFromSearchGroup(groupId, customerId);
       setCustomers(prev => prev.filter(c => c._id !== customerId));
-    } catch (err) {
+    } catch (error) {
       setError('Müşteri çıkarılırken hata oluştu');
+      console.error('Müşteri çıkarma hatası:', error);
     }
   };
 
@@ -201,7 +203,7 @@ function AddCustomerModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Contact[]>([]);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
 
@@ -216,9 +218,9 @@ function AddCustomerModal({
       if (!res.ok) throw new Error('Yetkisiz veya hata oluştu');
       const data = await res.json();
       setAllCustomers(data.data || []);
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       setAllCustomers([]);
-      const errorMessage = e instanceof Error ? e.message : 'Kayıtlı müşteri listesi alınamadı.';
+      const errorMessage = error instanceof Error ? error.message : 'Kayıtlı müşteri listesi alınamadı.';
       console.error('Müşteriler yüklenirken hata:', errorMessage);
     } finally {
       setLoadingCustomers(false);
@@ -251,8 +253,9 @@ function AddCustomerModal({
         note: customerEmail.trim() || undefined
       });
       onSuccess();
-    } catch (err) {
+    } catch (error) {
       setError('Müşteri eklenirken hata oluştu');
+      console.error('Müşteri ekleme hatası:', error);
     } finally {
       setLoading(false);
     }
@@ -273,8 +276,9 @@ function AddCustomerModal({
       }
       
       onSuccess();
-    } catch (err) {
+    } catch (error) {
       setError('Müşteriler eklenirken hata oluştu');
+      console.error('Müşteri ekleme hatası:', error);
     } finally {
       setLoading(false);
     }

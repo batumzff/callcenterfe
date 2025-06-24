@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/config/api';
 import { authService } from './auth';
-import { Contact } from './contactService';
+import { Contact, CallDetail } from './contactService';
 
 // SearchGroup interface'i - backend modeline uygun
 export interface SearchGroup {
@@ -322,10 +322,10 @@ class SearchGroupService {
     }
   }
 
-  // Dışarıdan müşteri ekle (yeni müşteri oluşturarak)
-  async addExternalCustomerToSearchGroup(groupId: string, customerData: ExternalCustomerData): Promise<any> {
+  // Dışarıdan müşteri ekleme
+  async addExternalCustomerToSearchGroup(groupId: string, customerData: ExternalCustomerData): Promise<SearchGroup> {
     try {
-      const response = await fetch(`${this.baseUrl}/${groupId}/external-customers`, {
+      const response = await fetch(`${this.baseUrl}/${groupId}/customers/external`, {
         method: 'POST',
         headers: getHeaders(),
         credentials: 'include',
@@ -337,10 +337,14 @@ class SearchGroupService {
         throw new Error(`Failed to add external customer: ${response.status} ${response.statusText}`);
       }
 
-      const result: ApiResponse<any> = await response.json();
+      const result: ApiResponse<SearchGroup> = await response.json();
       
       if (result.status === 'error') {
         throw new Error(result.message || 'Failed to add external customer');
+      }
+
+      if (!result.data) {
+        throw new Error('Failed to add external customer');
       }
 
       return result.data;
@@ -350,10 +354,10 @@ class SearchGroupService {
     }
   }
 
-  // Toplu müşteri ekle
-  async addBulkCustomersToSearchGroup(groupId: string, bulkData: BulkCustomerData): Promise<any> {
+  // Toplu müşteri ekleme
+  async addBulkCustomersToSearchGroup(groupId: string, bulkData: BulkCustomerData): Promise<SearchGroup> {
     try {
-      const response = await fetch(`${this.baseUrl}/${groupId}/bulk-customers`, {
+      const response = await fetch(`${this.baseUrl}/${groupId}/customers/bulk`, {
         method: 'POST',
         headers: getHeaders(),
         credentials: 'include',
@@ -365,10 +369,14 @@ class SearchGroupService {
         throw new Error(`Failed to add bulk customers: ${response.status} ${response.statusText}`);
       }
 
-      const result: ApiResponse<any> = await response.json();
+      const result: ApiResponse<SearchGroup> = await response.json();
       
       if (result.status === 'error') {
         throw new Error(result.message || 'Failed to add bulk customers');
+      }
+
+      if (!result.data) {
+        throw new Error('Failed to add bulk customers');
       }
 
       return result.data;
@@ -537,7 +545,7 @@ class SearchGroupService {
     }
   }
 
-  // Arama grubu istatistiklerini getir
+  // Grup istatistiklerini getir
   async getSearchGroupStats(groupId: string): Promise<SearchGroupStats> {
     try {
       const response = await fetch(`${this.baseUrl}/${groupId}/stats`, {
@@ -557,7 +565,7 @@ class SearchGroupService {
       }
 
       if (!result.data) {
-        throw new Error('Failed to fetch search group stats');
+        throw new Error('Search group stats not found');
       }
 
       return result.data;
@@ -567,8 +575,8 @@ class SearchGroupService {
     }
   }
 
-  // Arama grubundaki müşterilerin call detaylarını getir
-  async getSearchGroupCallDetails(groupId: string): Promise<any> {
+  // Grup çağrı detaylarını getir
+  async getSearchGroupCallDetails(groupId: string): Promise<CallDetail[]> {
     try {
       const response = await fetch(`${this.baseUrl}/${groupId}/call-details`, {
         headers: getHeaders(),
@@ -577,16 +585,16 @@ class SearchGroupService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch call details: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to fetch search group call details: ${response.status} ${response.statusText}`);
       }
 
-      const result: ApiResponse<any> = await response.json();
+      const result: ApiResponse<CallDetail[]> = await response.json();
       
       if (result.status === 'error') {
-        throw new Error(result.message || 'Failed to fetch call details');
+        throw new Error(result.message || 'Failed to fetch search group call details');
       }
 
-      return result.data;
+      return result.data || [];
     } catch (error) {
       console.error('Error in getSearchGroupCallDetails:', error);
       throw error;

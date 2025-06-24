@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { searchGroupService, SearchGroup } from '@/services/searchGroupService';
-import { getHeaders } from '@/services/contactService';
+import { getHeaders, Contact } from '@/services/contactService';
 import Link from 'next/link';
 
 export default function SearchGroupsPage() {
@@ -22,8 +22,9 @@ export default function SearchGroupsPage() {
       setLoading(true);
       const data = await searchGroupService.getAllSearchGroups();
       setGroups(data);
-    } catch (err) {
+    } catch (error) {
       setError('Gruplar yüklenirken hata oluştu');
+      console.error('Gruplar yükleme hatası:', error);
     } finally {
       setLoading(false);
     }
@@ -325,7 +326,7 @@ function AddCustomerModal({
   const [error, setError] = useState<string | null>(null);
   
   // Mevcut müşteriler için state'ler
-  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Contact[]>([]);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
 
@@ -341,9 +342,9 @@ function AddCustomerModal({
       if (!res.ok) throw new Error('Yetkisiz veya hata oluştu');
       const data = await res.json();
       setAllCustomers(data.data || []);
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       setAllCustomers([]);
-      const errorMessage = e instanceof Error ? e.message : 'Kayıtlı müşteri listesi alınamadı.';
+      const errorMessage = error instanceof Error ? error.message : 'Kayıtlı müşteri listesi alınamadı.';
       console.error('Müşteriler yüklenirken hata:', errorMessage);
     } finally {
       setLoadingCustomers(false);
@@ -376,8 +377,9 @@ function AddCustomerModal({
         note: customerEmail.trim() || undefined
       });
       onSuccess();
-    } catch (err) {
+    } catch (error) {
       setError('Müşteri eklenirken hata oluştu');
+      console.error('Müşteri ekleme hatası:', error);
     } finally {
       setLoading(false);
     }
@@ -393,14 +395,14 @@ function AddCustomerModal({
       setLoading(true);
       setError(null);
       
-      // Seçili müşterileri gruba ekle
       for (const customerId of selectedCustomerIds) {
         await searchGroupService.addCustomerToSearchGroup(group._id, customerId);
       }
       
       onSuccess();
-    } catch (err) {
+    } catch (error) {
       setError('Müşteriler eklenirken hata oluştu');
+      console.error('Müşteri ekleme hatası:', error);
     } finally {
       setLoading(false);
     }

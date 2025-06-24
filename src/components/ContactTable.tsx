@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Contact, ContactWithLastCall, contactService, getHeaders } from '@/services/contactService';
+import { SearchGroup, searchGroupService } from '@/services/searchGroupService';
 import ContactInput from './ContactInput';
 
 interface ContactTableProps {
@@ -158,11 +159,20 @@ export default function ContactTable({ projectId }: ContactTableProps) {
   const [showAllCustomersModal, setShowAllCustomersModal] = useState(false);
   const [customerModalError, setCustomerModalError] = useState<string | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  
+  // Grup seçimi için yeni state'ler
+  const [allGroups, setAllGroups] = useState<SearchGroup[]>([]);
+  const [showGroupsModal, setShowGroupsModal] = useState(false);
+  const [groupsModalError, setGroupsModalError] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [isImportingGroup, setIsImportingGroup] = useState(false);
 
   const loadContacts = useCallback(async () => {
     try {
+      console.log('Müşteri listesi yükleniyor... projectId:', projectId);
       // Her zaman gerçek müşteri listesini çek
       const savedContacts = await contactService.getContactsWithCallDetails(projectId);
+      console.log('Yüklenen müşteriler:', savedContacts);
 
       // Her müşteri için, ilgili projeye ait call detail'i yeni endpoint'ten çek
       const customersWithProjectCallDetail = await Promise.all(
@@ -184,8 +194,10 @@ export default function ContactTable({ projectId }: ContactTableProps) {
         ...c,
         _id: c._id,
       }));
+      console.log('Normalize edilmiş müşteriler:', normalizedCustomers);
       setSavedCustomers(normalizedCustomers);
-    } catch {
+    } catch (error) {
+      console.error('Müşteri listesi yüklenirken hata:', error);
       setSavedCustomers([]);
     }
   }, [projectId]);
@@ -603,15 +615,135 @@ export default function ContactTable({ projectId }: ContactTableProps) {
     }
   };
 
+  // Grup seçimi fonksiyonları
+  const fetchAllGroups = async () => {
+    try {
+      setGroupsModalError(null);
+      console.log('Gruplar yükleniyor...');
+      const groups = await searchGroupService.getAllSearchGroups();
+      console.log('Yüklenen gruplar:', groups);
+      console.log('Grup müşteri sayıları:', groups.map(g => ({ name: g.name, customerCount: g.customers?.length || 0 })));
+      setAllGroups(groups);
+      setShowGroupsModal(true);
+    } catch (e: unknown) {
+      setAllGroups([]);
+      setShowGroupsModal(true);
+      const errorMessage = e instanceof Error ? e.message : 'Grup listesi alınamadı.';
+      setGroupsModalError(errorMessage);
+      console.error('Grup yükleme hatası:', e);
+    }
+  };
+
+  const handleGroupImport = async () => {
+    if (!selectedGroupId) {
+      setGroupsModalError('Lütfen bir grup seçin');
+      return;
+    }
+
+    try {
+      setIsImportingGroup(true);
+      setGroupsModalError(null);
+      
+      // Seçili grubu bul
+      const selectedGroup = allGroups.find(g => g._id === selectedGroupId);
+      if (!selectedGroup) {
+        throw new Error('Seçili grup bulunamadı');
+      }
+
+      if (!selectedGroup.customers || selectedGroup.customers.length === 0) {
+        setGroupsModalError('Seçili grupta müşteri bulunmuyor');
+        return;
+      }
+
+      console.log('Grup müşterileri:', selectedGroup.customers);
+      
+      // Gruptaki müşterileri projeye ekle
+      const addedCustomers = [];
+      const failedCustomers = [];
+      
+      for (const customer of selectedGroup.customers) {
+        try {
+          if (customer._id) {
+            // Mevcut müşteriyi projeye ekle
+            console.log(`Mevcut müşteri projeye ekleniyor: ${customer.name} (${customer._id})`);
+            const response = await fetch(`/api/customers/${customer._id}/project/${projectId}`, {
+              method: 'POST',
+              headers: getHeaders(),
+              credentials: 'include',
+              mode: 'cors'
+            });
+            
+            if (response.ok) {
+              addedCustomers.push(customer);
+              console.log(`Müşteri başarıyla eklendi: ${customer.name}`);
+            } else {
+              const errorData = await response.json();
+              console.error(`Müşteri eklenemedi: ${customer.name}`, errorData);
+              failedCustomers.push(customer);
+            }
+          } else {
+            // Yeni müşteri ise kaydet
+            console.log(`Yeni müşteri kaydediliyor: ${customer.name}`);
+            const savedContacts = await contactService.saveContacts(projectId, [{
+              name: customer.name,
+              phoneNumber: customer.phoneNumber,
+              note: customer.note,
+              record: customer.record,
+              status: customer.status
+            }]);
+            addedCustomers.push(...savedContacts);
+            console.log(`Yeni müşteri başarıyla kaydedildi: ${customer.name}`);
+          }
+        } catch (err) {
+          console.error(`Müşteri işlenirken hata: ${customer.name}`, err);
+          failedCustomers.push(customer);
+        }
+      }
+      
+      console.log('Başarıyla eklenen müşteriler:', addedCustomers);
+      console.log('Eklenemeyen müşteriler:', failedCustomers);
+      
+      if (failedCustomers.length > 0) {
+        setGroupsModalError(`${failedCustomers.length} müşteri eklenemedi. Başarıyla eklenen: ${addedCustomers.length}`);
+      }
+      
+      // Müşteri listesini yenile
+      await loadContacts();
+      
+      // Modal'ı kapat
+      setShowGroupsModal(false);
+      setSelectedGroupId('');
+      
+      // Başarı mesajı göster
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Grup import edilirken hata oluştu.';
+      setGroupsModalError(errorMessage);
+      console.error('Grup import hatası:', e);
+    } finally {
+      setIsImportingGroup(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Kayıtlı Müşterileri Listele Butonu */}
-      <button
-        onClick={fetchAllCustomers}
-        className="mb-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-      >
-        Kayıtlı Müşterileri Listele
-      </button>
+      {/* Müşteri Ekleme Butonları */}
+      <div className="flex space-x-2 mb-4">
+        <button
+          onClick={fetchAllCustomers}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Kayıtlı Müşterileri Listele
+        </button>
+        <button
+          onClick={fetchAllGroups}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          Grup Seç ve İçe Aktar
+        </button>
+      </div>
+      
       {/* Başarı ve hata mesajları */}
       {saveSuccess && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
@@ -829,6 +961,74 @@ export default function ContactTable({ projectId }: ContactTableProps) {
               className={`px-4 py-2 rounded text-white ${selectedCustomerIds.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
             >
               Seçili Müşterileri Projeye Ekle
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Arama Grupları Modalı */}
+      {showGroupsModal && (
+        <Modal onClose={() => setShowGroupsModal(false)}>
+          <h2 className="text-lg font-semibold mb-4">Arama Grupları</h2>
+          {groupsModalError && (
+            <div className="mb-2 text-red-600">{groupsModalError}</div>
+          )}
+          <div className="space-y-4">
+            {allGroups.map((group) => (
+              <div key={group._id} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="font-medium text-gray-900">{group.name}</h3>
+                    <p className="text-sm text-gray-600">{group.description}</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">
+                      {group.customerCount || group.customers.length} müşteri
+                    </span>
+                    <input
+                      type="radio"
+                      name="selectedGroup"
+                      value={group._id}
+                      checked={selectedGroupId === group._id}
+                      onChange={(e) => setSelectedGroupId(e.target.value)}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                    />
+                  </div>
+                </div>
+                {group.customers.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    <strong>Müşteriler:</strong> {group.customers.map(c => c.name).join(', ')}
+                    <br />
+                    <strong>Müşteri Detayları:</strong>
+                    <ul className="mt-1 ml-4">
+                      {group.customers.map(c => (
+                        <li key={c._id}>
+                          {c.name} - {c.phoneNumber} {c.note && `(${c.note})`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              onClick={() => setShowGroupsModal(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleGroupImport}
+              disabled={!selectedGroupId || isImportingGroup}
+              className={`px-4 py-2 rounded-md text-white ${
+                !selectedGroupId || isImportingGroup 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              {isImportingGroup ? 'İçe Aktarılıyor...' : 'Grubu Projeye Ekle'}
             </button>
           </div>
         </Modal>

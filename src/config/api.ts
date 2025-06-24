@@ -1,3 +1,5 @@
+import { authService } from '@/services/auth';
+
 export const API_BASE_URL = '/api';
 
 export const API_ENDPOINTS = {
@@ -12,4 +14,12 @@ export const apiConfig = {
   headers: {
     'Content-Type': 'application/json',
   },
+};
+
+export const getHeaders = () => {
+  const token = authService.getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
 }; 

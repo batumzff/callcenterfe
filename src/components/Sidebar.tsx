@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const menu = [
   { name: "Projeler", path: "/projects" },
   { name: "Agentlar", path: "/agents" },
+  { name: "Arama Grupları", path: "/search-groups" },
 ];
 
 interface SidebarProps {

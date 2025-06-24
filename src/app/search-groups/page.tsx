@@ -196,8 +196,9 @@ function CreateGroupModal({
         }
       });
       onSuccess();
-    } catch (err) {
+    } catch (error) {
       setError('Grup oluşturulurken hata oluştu');
+      console.error('Grup oluşturma hatası:', error);
     } finally {
       setLoading(false);
     }

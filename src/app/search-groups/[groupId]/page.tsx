@@ -10,6 +10,7 @@ export default function SearchGroupDetailPage() {
   const groupId = params.groupId as string;
   
   const [group, setGroup] = useState<SearchGroup | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

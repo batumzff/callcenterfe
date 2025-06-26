@@ -336,7 +336,7 @@ class ContactService {
     }
   }
 
-  async startCalls(contacts: Contact[]): Promise<void> {
+  async startCalls(contacts: Contact[], projectId: string): Promise<void> {
     try {
       console.log('Arama başlatılıyor, seçili müşteriler:', contacts.map(c => ({
         name: c.name,
@@ -347,7 +347,8 @@ class ContactService {
       for (const contact of contacts) {
         console.log('Müşteri için arama başlatılıyor:', {
           name: contact.name,
-          phoneNumber: contact.phoneNumber
+          phoneNumber: contact.phoneNumber,
+          projectId: projectId
         });
 
         const response = await fetch(`${API_BASE_URL}/retell/call`, {
@@ -357,7 +358,7 @@ class ContactService {
           body: JSON.stringify({
             name: contact.name,
             phoneNumber: contact.phoneNumber,
-            projectId: contact.projectId
+            projectId: projectId
           }),
         });
 

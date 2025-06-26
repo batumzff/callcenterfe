@@ -378,7 +378,7 @@ export default function ContactTable({ projectId }: ContactTableProps) {
 
     try {
       console.log('Seçili müşteriler için arama başlatılıyor:', selectedCustomers.map(c => c.name));
-      await contactService.startCalls(selectedCustomers);
+      await contactService.startCalls(selectedCustomers, projectId);
       
       setCallSuccess(true);
       setIsPolling(true);
